@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finn — bunq AI Assistant</title>
+<style>
+  :root {
+    --green: #00DC84;
+    --dark: #1A1A2E;
+    --darker: #0F0F1A;
+    --card: #242438;
+    --text: #E8E8F0;
+    --muted: #8888A8;
+    --red: #FF4D6D;
+    --yellow: #FFD60A;
+    --radius: 12px;
+    --font: 'Inter', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--darker); color: var(--text); font-family: var(--font); height: 100vh; display: grid; grid-template-columns: 1fr 380px; grid-template-rows: auto 1fr; gap: 12px; padding: 12px; overflow: hidden; }
+  h3 { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px; }
+  .card { background: var(--card); border-radius: var(--radius); padding: 16px; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 0.65rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; text-transform: uppercase; }
+  .badge.mock { background: rgba(255,214,10,0.15); color: var(--yellow); border: 1px solid rgba(255,214,10,0.3); }
+  .badge.live { background: rgba(0,220,132,0.15); color: var(--green); border: 1px solid rgba(0,220,132,0.3); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .dot.pulse { animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Header */
+  header { grid-column: 1/-1; display: flex; align-items: center; gap: 12px; padding: 8px 4px; }
+  .logo { font-size: 1.4rem; font-weight: 800; color: var(--green); }
+  .logo span { color: var(--text); font-weight: 300; }
+  header .spacer { flex: 1; }
+
+  /* Left: Chat panel */
+  #chat-panel { display: flex; flex-direction: column; gap: 0; }
+  #messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 0; scrollbar-width: thin; }
+  .msg { max-width: 80%; display: flex; flex-direction: column; gap: 4px; }
+  .msg.user { align-self: flex-end; }
+  .msg.assistant { align-self: flex-start; }
+  .msg .bubble { padding: 10px 14px; border-radius: var(--radius); font-size: 0.9rem; line-height: 1.5; }
+  .msg.user .bubble { background: var(--green); color: var(--dark); font-weight: 500; border-bottom-right-radius: 4px; }
+  .msg.assistant .bubble { background: var(--card); border: 1px solid rgba(255,255,255,0.06); border-bottom-left-radius: 4px; }
+  .msg .timestamp { font-size: 0.65rem; color: var(--muted); padding: 0 4px; }
+  .msg.user .timestamp { text-align: right; }
+
+  /* Tool call card */
+  .tool-card { background: rgba(0,220,132,0.05); border: 1px solid rgba(0,220,132,0.15); border-radius: 8px; padding: 8px 12px; font-size: 0.75rem; cursor: pointer; align-self: flex-start; max-width: 90%; }
+  .tool-card summary { color: var(--green); font-weight: 600; list-style: none; display: flex; align-items: center; gap: 6px; }
+  .tool-card summary::before { content: '⚙'; }
+  .tool-card pre { margin-top: 8px; color: var(--muted); font-size: 0.7rem; white-space: pre-wrap; word-break: break-all; }
+  .tool-flash { animation: flash 0.6s ease-out; }
+  @keyframes flash { 0%{background:rgba(0,220,132,0.3)} 100%{background:rgba(0,220,132,0.05)} }
+
+  /* Chat input */
+  #input-row { display: flex; gap: 8px; margin-top: 12px; }
+  #chat-input { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
+  #chat-input:focus { border-color: var(--green); }
+  #chat-input::placeholder { color: var(--muted); }
+  button { border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.15s; }
+  #send-btn { background: var(--green); color: var(--dark); padding: 10px 18px; }
+  #send-btn:hover { opacity: 0.85; }
+  #send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Right column */
+  #right-col { display: flex; flex-direction: column; gap: 12px; }
+
+  /* Account panel */
+  #account-panel { }
+  .balance { font-size: 2rem; font-weight: 800; color: var(--green); }
+  .balance-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+  .balance-name { font-size: 0.8rem; color: var(--text); margin-top: 4px; }
+  .txn-list { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .txn { display: flex; align-items: center; gap: 8px; }
+  .txn-icon { width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; flex-shrink: 0; }
+  .txn-info { flex: 1; min-width: 0; }
+  .txn-merchant { font-size: 0.8rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .txn-date { font-size: 0.65rem; color: var(--muted); }
+  .txn-amount { font-size: 0.85rem; font-weight: 700; flex-shrink: 0; }
+  .txn-amount.neg { color: var(--red); }
+  .txn-amount.pos { color: var(--green); }
+
+  /* Voice panel */
+  #voice-panel { }
+  #mic-btn { width: 64px; height: 64px; border-radius: 50%; background: var(--card); border: 2px solid rgba(255,255,255,0.1); color: var(--text); font-size: 1.4rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; transition: all 0.2s; }
+  #mic-btn.recording { background: var(--red); border-color: var(--red); animation: pulseMic 0.8s infinite; }
+  @keyframes pulseMic { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+  #voice-status { text-align: center; font-size: 0.75rem; color: var(--muted); min-height: 18px; }
+  #transcript-box { margin-top: 8px; background: rgba(255,255,255,0.03); border-radius: 6px; padding: 8px; font-size: 0.75rem; color: var(--muted); min-height: 36px; font-style: italic; }
+
+  /* Receipt panel */
+  #receipt-panel { }
+  #receipt-row { display: flex; gap: 8px; align-items: center; }
+  #file-input { display: none; }
+  #snap-btn { background: rgba(255,255,255,0.08); color: var(--text); padding: 8px 14px; font-size: 0.8rem; }
+  #snap-btn:hover { background: rgba(255,255,255,0.12); }
+  #process-btn { background: var(--green); color: var(--dark); padding: 8px 14px; font-size: 0.8rem; }
+  #process-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  #receipt-preview { margin-top: 8px; max-height: 100px; border-radius: 6px; object-fit: cover; display: none; width: 100%; }
+  #receipt-result { margin-top: 8px; font-size: 0.72rem; color: var(--muted); min-height: 20px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Finn <span>by bunq</span></div>
+  <div id="mode-badge" class="badge mock"><div class="dot pulse"></div> MOCK</div>
+  <div class="spacer"></div>
+  <div style="font-size:0.72rem;color:var(--muted);">bunq Hackathon 7.0</div>
+</header>
+
+<!-- LEFT: Chat panel -->
+<div class="card" id="chat-panel">
+  <h3>Chat with Finn</h3>
+  <div id="messages">
+    <!-- Initial greeting -->
+    <div class="msg assistant">
+      <div class="bubble">Hey! I'm Finn, your bunq AI assistant. Ask me about your balance, spending, or snap a receipt to split a bill. 🏦</div>
+      <div class="timestamp">Just now</div>
+    </div>
+  </div>
+  <div id="input-row">
+    <input id="chat-input" type="text" placeholder="Ask Finn something… e.g. 'What's my balance?'" autocomplete="off">
+    <button id="send-btn">Send</button>
+  </div>
+</div>
+
+<!-- RIGHT column -->
+<div id="right-col">
+
+  <!-- Account panel -->
+  <div class="card" id="account-panel">
+    <h3>Account</h3>
+    <div class="balance-label">Current balance</div>
+    <div class="balance" id="balance-display">€—</div>
+    <div class="balance-name" id="account-name">—</div>
+    <div class="txn-list" id="txn-list"></div>
+  </div>
+
+  <!-- Voice panel -->
+  <div class="card" id="voice-panel">
+    <h3>Voice</h3>
+    <button id="mic-btn" title="Hold to record">🎙️</button>
+    <div id="voice-status">Hold mic to speak</div>
+    <div id="transcript-box">Transcript will appear here…</div>
+  </div>
+
+  <!-- Receipt panel -->
+  <div class="card" id="receipt-panel">
+    <h3>Receipt Scanner</h3>
+    <div id="receipt-row">
+      <input type="file" id="file-input" accept="image/*">
+      <button id="snap-btn">📷 Upload Receipt</button>
+      <button id="process-btn" disabled>Process</button>
+    </div>
+    <img id="receipt-preview" src="" alt="Receipt preview">
+    <div id="receipt-result">Upload a receipt to parse it…</div>
+  </div>
+
+</div>
+
+<script>
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const BASE = '';  // same origin
+let isMock = true;
+
+function now() {
+  return new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+function categoryIcon(cat) {
+  const icons = {food:'🛒',transport:'🚆',rent:'🏠',entertainment:'🎬',utilities:'💡',other:'📦'};
+  return icons[cat] || '📦';
+}
+
+// ── Account state refresh ─────────────────────────────────────────────────────
+async function refreshState() {
+  try {
+    const r = await fetch(`${BASE}/state?mock=${isMock}`);
+    const data = await r.json();
+    isMock = data.mock_mode;
+    document.getElementById('mode-badge').className = `badge ${isMock ? 'mock' : 'live'}`;
+    document.getElementById('mode-badge').innerHTML = `<div class="dot${isMock ? ' pulse':''}"></div> ${isMock ? 'MOCK' : 'LIVE'}`;
+    document.getElementById('balance-display').textContent = `€${data.account.balance_eur.toFixed(2)}`;
+    document.getElementById('account-name').textContent = data.account.account_name || '';
+    const list = document.getElementById('txn-list');
+    list.innerHTML = '';
+    (data.recent_transactions || []).forEach(t => {
+      const sign = t.amount_eur >= 0 ? '+' : '';
+      const cls = t.amount_eur >= 0 ? 'pos' : 'neg';
+      list.innerHTML += `
+        <div class="txn">
+          <div class="txn-icon">${categoryIcon(t.category)}</div>
+          <div class="txn-info">
+            <div class="txn-merchant">${t.merchant}</div>
+            <div class="txn-date">${t.date}</div>
+          </div>
+          <div class="txn-amount ${cls}">${sign}€${Math.abs(t.amount_eur).toFixed(2)}</div>
+        </div>`;
+    });
+  } catch(e) { console.warn('State refresh failed', e); }
+}
+refreshState();
+setInterval(refreshState, 5000);
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+function appendMessage(role, text, toolCalls=[]) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = `<div class="bubble">${text.replace(/\n/g,'<br>')}</div><div class="timestamp">${now()}</div>`;
+  msgs.appendChild(div);
+  // Tool call cards
+  toolCalls.forEach(tc => {
+    const details = document.createElement('details');
+    details.className = 'tool-card tool-flash';
+    details.innerHTML = `<summary>${tc.name}</summary><pre>${JSON.stringify(tc.args, null, 2)}</pre>`;
+    msgs.appendChild(details);
+  });
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function setLoading(on) {
+  document.getElementById('send-btn').disabled = on;
+  document.getElementById('chat-input').disabled = on;
+}
+
+async function sendMessage(text) {
+  if (!text.trim()) return;
+  appendMessage('user', text);
+  document.getElementById('chat-input').value = '';
+  setLoading(true);
+
+  // Typing indicator
+  const typing = document.createElement('div');
+  typing.className = 'msg assistant';
+  typing.id = 'typing';
+  typing.innerHTML = '<div class="bubble" style="color:var(--muted)">Finn is thinking…</div>';
+  document.getElementById('messages').appendChild(typing);
+  document.getElementById('messages').scrollTop = 99999;
+
+  try {
+    const r = await fetch(`${BASE}/chat?mock=${isMock}`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({message: text}),
+    });
+    const data = await r.json();
+    document.getElementById('typing')?.remove();
+    appendMessage('assistant', data.response || '(no response)', data.tool_calls || []);
+    await refreshState();
+  } catch(e) {
+    document.getElementById('typing')?.remove();
+    appendMessage('assistant', '⚠️ Connection error. Is the server running?');
+  }
+  setLoading(false);
+  document.getElementById('chat-input').focus();
+}
+
+document.getElementById('send-btn').addEventListener('click', () => {
+  sendMessage(document.getElementById('chat-input').value);
+});
+document.getElementById('chat-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e.target.value); }
+});
+
+// ── Voice (hold-to-record) ────────────────────────────────────────────────────
+let mediaRecorder = null;
+let audioChunks = [];
+const micBtn = document.getElementById('mic-btn');
+const voiceStatus = document.getElementById('voice-status');
+const transcriptBox = document.getElementById('transcript-box');
+
+micBtn.addEventListener('mousedown', startRecording);
+micBtn.addEventListener('touchstart', e => { e.preventDefault(); startRecording(); });
+micBtn.addEventListener('mouseup', stopRecording);
+micBtn.addEventListener('mouseleave', stopRecording);
+micBtn.addEventListener('touchend', stopRecording);
+
+async function startRecording() {
+  if (mediaRecorder) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.start();
+    micBtn.classList.add('recording');
+    voiceStatus.textContent = '🔴 Recording… release to send';
+  } catch(e) {
+    voiceStatus.textContent = '⚠️ Microphone access denied';
+  }
+}
+
+async function stopRecording() {
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+  mediaRecorder.stop();
+  micBtn.classList.remove('recording');
+  voiceStatus.textContent = 'Processing…';
+
+  mediaRecorder.onstop = async () => {
+    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+    mediaRecorder.stream.getTracks().forEach(t => t.stop());
+    mediaRecorder = null;
+
+    const fd = new FormData();
+    fd.append('audio', blob, 'recording.webm');
+    try {
+      const r = await fetch(`${BASE}/voice?mock=${isMock}`, { method: 'POST', body: fd });
+      const data = await r.json();
+      transcriptBox.textContent = data.transcript || '(no transcript)';
+      appendMessage('user', data.transcript || '(voice)', []);
+      appendMessage('assistant', data.response || '', []);
+      voiceStatus.textContent = 'Done. Hold mic to speak again.';
+      // Play TTS audio
+      if (data.audio_b64) {
+        const audio = new Audio('data:audio/mp3;base64,' + data.audio_b64);
+        audio.play().catch(() => {});
+      }
+      await refreshState();
+    } catch(e) {
+      voiceStatus.textContent = '⚠️ Voice processing failed';
+      transcriptBox.textContent = 'Error: ' + e.message;
+    }
+  };
+}
+
+// ── Receipt ───────────────────────────────────────────────────────────────────
+const fileInput = document.getElementById('file-input');
+const snapBtn = document.getElementById('snap-btn');
+const processBtn = document.getElementById('process-btn');
+const receiptPreview = document.getElementById('receipt-preview');
+const receiptResult = document.getElementById('receipt-result');
+
+snapBtn.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  receiptPreview.src = url;
+  receiptPreview.style.display = 'block';
+  processBtn.disabled = false;
+  receiptResult.textContent = 'Ready to process…';
+});
+
+processBtn.addEventListener('click', async () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+  processBtn.disabled = true;
+  receiptResult.textContent = '🔍 Parsing receipt…';
+  const fd = new FormData();
+  fd.append('image', file);
+  fd.append('num_people', '1');
+  fd.append('run_agent_flag', 'true');
+  try {
+    const r = await fetch(`${BASE}/receipt?mock=${isMock}`, { method: 'POST', body: fd });
+    const data = await r.json();
+    const rec = data.parsed_receipt;
+    receiptResult.innerHTML = `<b>${rec.merchant || 'Unknown'}</b> — €${rec.total ?? '?'} · ${rec.date || 'no date'}`;
+    if (data.agent_response) {
+      appendMessage('assistant', data.agent_response, []);
+    }
+  } catch(e) {
+    receiptResult.textContent = '⚠️ Receipt processing failed: ' + e.message;
+  }
+  processBtn.disabled = false;
+});
+</script>
+</body>
+</html>

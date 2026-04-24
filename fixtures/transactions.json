@@ -1,0 +1,191 @@
+{
+  "account": {
+    "id": "mock-account-001",
+    "iban": "NL91BUNQ0417164300",
+    "name": "Emma de Vries",
+    "balance_eur": 847.32,
+    "currency": "EUR"
+  },
+  "transactions": [
+    {
+      "id": "txn-001",
+      "date": "2026-04-15",
+      "merchant": "Woonstichting TU Delft",
+      "amount_eur": -550.00,
+      "description": "Huur april 2026",
+      "category": "rent",
+      "counterparty_iban": "NL02ABNA0123456789"
+    },
+    {
+      "id": "txn-002",
+      "date": "2026-04-14",
+      "merchant": "Albert Heijn",
+      "amount_eur": -34.80,
+      "description": "Boodschappen",
+      "category": "food",
+      "counterparty_iban": "NL69INGB0123456789"
+    },
+    {
+      "id": "txn-003",
+      "date": "2026-04-13",
+      "merchant": "NS Reizigers",
+      "amount_eur": -22.40,
+      "description": "Treinreis Delft-Amsterdam",
+      "category": "transport",
+      "counterparty_iban": "NL77RABO0123456789"
+    },
+    {
+      "id": "txn-004",
+      "date": "2026-04-12",
+      "merchant": "Thuisbezorgd",
+      "amount_eur": -18.50,
+      "description": "Bestelling #847302",
+      "category": "food",
+      "counterparty_iban": "NL29BUNQ0987654321"
+    },
+    {
+      "id": "txn-005",
+      "date": "2026-04-11",
+      "merchant": "Spotify",
+      "amount_eur": -9.99,
+      "description": "Spotify Premium",
+      "category": "entertainment",
+      "counterparty_iban": "NL57BUNQ0246813579"
+    },
+    {
+      "id": "txn-006",
+      "date": "2026-04-10",
+      "merchant": "Stedin",
+      "amount_eur": -62.00,
+      "description": "Energie factuur maart",
+      "category": "utilities",
+      "counterparty_iban": "NL44ABNA0246813579"
+    },
+    {
+      "id": "txn-007",
+      "date": "2026-04-09",
+      "merchant": "Albert Heijn",
+      "amount_eur": -28.15,
+      "description": "Boodschappen",
+      "category": "food",
+      "counterparty_iban": "NL69INGB0123456789"
+    },
+    {
+      "id": "txn-008",
+      "date": "2026-04-08",
+      "merchant": "OV-chipkaart",
+      "amount_eur": -15.00,
+      "description": "OV-chipkaart opladen",
+      "category": "transport",
+      "counterparty_iban": "NL13INGB0987654321"
+    },
+    {
+      "id": "txn-009",
+      "date": "2026-04-07",
+      "merchant": "Bol.com",
+      "amount_eur": -45.99,
+      "description": "Studieboek Thermodynamics",
+      "category": "other",
+      "counterparty_iban": "NL55ABNA0111222333"
+    },
+    {
+      "id": "txn-010",
+      "date": "2026-04-06",
+      "merchant": "Lidl",
+      "amount_eur": -22.60,
+      "description": "Boodschappen",
+      "category": "food",
+      "counterparty_iban": "NL39RABO0222333444"
+    },
+    {
+      "id": "txn-011",
+      "date": "2026-04-05",
+      "merchant": "Delft Stadsgewest",
+      "amount_eur": -7.50,
+      "description": "Parkeervergunning",
+      "category": "transport",
+      "counterparty_iban": "NL81BUNQ0333444555"
+    },
+    {
+      "id": "txn-012",
+      "date": "2026-04-04",
+      "merchant": "Netflix",
+      "amount_eur": -13.99,
+      "description": "Netflix Standaard",
+      "category": "entertainment",
+      "counterparty_iban": "NL22BUNQ0444555666"
+    },
+    {
+      "id": "txn-013",
+      "date": "2026-04-03",
+      "merchant": "Xenos",
+      "amount_eur": -31.40,
+      "description": "Woonaccessoires",
+      "category": "other",
+      "counterparty_iban": "NL64ABNA0555666777"
+    },
+    {
+      "id": "txn-014",
+      "date": "2026-04-02",
+      "merchant": "GreenChoice",
+      "amount_eur": -29.00,
+      "description": "Internet abonnement april",
+      "category": "utilities",
+      "counterparty_iban": "NL06INGB0666777888"
+    },
+    {
+      "id": "txn-015",
+      "date": "2026-04-01",
+      "merchant": "Werkgever TU Delft",
+      "amount_eur": 1400.00,
+      "description": "Studentassistent salaris april",
+      "category": "other",
+      "counterparty_iban": "NL48ABNA0777888999"
+    },
+    {
+      "id": "txn-016",
+      "date": "2026-03-30",
+      "merchant": "Domino's Pizza",
+      "amount_eur": -24.00,
+      "description": "Pizzafeestje met huisgenoten",
+      "category": "food",
+      "counterparty_iban": "NL90BUNQ0888999000"
+    },
+    {
+      "id": "txn-017",
+      "date": "2026-03-28",
+      "merchant": "Decathlon",
+      "amount_eur": -39.95,
+      "description": "Sportkleding",
+      "category": "other",
+      "counterparty_iban": "NL32RABO0999000111"
+    },
+    {
+      "id": "txn-018",
+      "date": "2026-03-27",
+      "merchant": "Jumbo",
+      "amount_eur": -19.85,
+      "description": "Weekboodschappen",
+      "category": "food",
+      "counterparty_iban": "NL74INGB0000111222"
+    },
+    {
+      "id": "txn-019",
+      "date": "2026-03-26",
+      "merchant": "NS Reizigers",
+      "amount_eur": -8.60,
+      "description": "Treinreis Delft-Rotterdam",
+      "category": "transport",
+      "counterparty_iban": "NL77RABO0123456789"
+    },
+    {
+      "id": "txn-020",
+      "date": "2026-03-25",
+      "merchant": "Pathé",
+      "amount_eur": -13.50,
+      "description": "Bioscoop",
+      "category": "entertainment",
+      "counterparty_iban": "NL16ABNA0111333555"
+    }
+  ]
+}
