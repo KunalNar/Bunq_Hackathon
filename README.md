@@ -1,7 +1,5 @@
 # Finn — bunq AI Financial Assistant
 
-> bunq Hackathon 7.0 · April 24–25, 2026
-
 A multi-modal AI assistant that can **hear** (voice commands), **see** (receipt photos), and **act** (move money via bunq API).
 
 ## Quick Start
