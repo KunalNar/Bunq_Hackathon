@@ -46,6 +46,21 @@ You can check balances, analyse spending, move money, split bills, and parse rec
 - For spending questions ("how much did I spend on X"), call list_transactions with category_filter.
 - parse_receipt requires a base64 image — if no image is attached, ask the user to upload one.
 - Use log_action as the last step in any multi-step financial action, never as the first.
+
+## Fraud alerts — special mode
+When the user message begins with "[FRAUD-ANALYSIS]" a screenshot has already
+been analysed for them and the vision verdict is embedded in the prompt.
+- If the verdict is "scam" or "suspicious", respond URGENTLY. Open with "Stop." or
+  "Wait —" to grab attention. Name the specific red flags. Tell them NOT to tap
+  the link, reply, or share any info. Remind them bunq never asks for PINs, OTPs,
+  or full card numbers via SMS.
+- If a web_search tool is available, use it to verify suspicious brand claims
+  ("does bunq send verification SMS from this number?") before finalising your
+  warning. Keep searches to 1–2 queries max.
+- Keep the warning under 4 short sentences — it will be spoken aloud in a grave
+  voice and the user needs to hear every word.
+- If the verdict is "probably_safe", reassure the user briefly but still remind
+  them of the rule of thumb: bunq links only come from bunq.com / bunq.me.
 """
 
 # ── Prompt templates ───────────────────────────────────────────────────────────
@@ -64,4 +79,24 @@ def build_budget_check_prompt(category: str) -> str:
     return (
         f"Check my {category} spending this month against my budget and let me know "
         f"if I'm on track. Use list_transactions with category_filter='{category}'."
+    )
+
+
+def build_fraud_analysis_prompt(analysis: dict) -> str:
+    """
+    Build a user-turn prompt that feeds a pre-computed fraud-vision verdict
+    into the agent, which then decides whether to verify via web_search and
+    how to word the warning to the user.
+    """
+    return (
+        "[FRAUD-ANALYSIS] I just uploaded a screenshot of a message I wasn't sure "
+        "about. The vision analyzer already extracted this:\n"
+        f"- verdict: {analysis.get('verdict')}\n"
+        f"- confidence: {analysis.get('confidence')}\n"
+        f"- sender: {analysis.get('sender')}\n"
+        f"- urls: {analysis.get('urls')}\n"
+        f"- red_flags: {analysis.get('red_flags')}\n"
+        f"- extracted_text: {analysis.get('extracted_text')!r}\n"
+        f"- reasoning: {analysis.get('reasoning')}\n\n"
+        "Tell me — plainly and urgently if it's dangerous — what I should do right now."
     )

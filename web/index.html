@@ -90,6 +90,30 @@
   #voice-status { text-align: center; font-size: 0.75rem; color: var(--muted); min-height: 18px; }
   #transcript-box { margin-top: 8px; background: rgba(255,255,255,0.03); border-radius: 6px; padding: 8px; font-size: 0.75rem; color: var(--muted); min-height: 36px; font-style: italic; }
 
+  /* Fraud alert mode — applied to <body> when a scam is detected */
+  body.alert-mode { background: #2a0a12; }
+  body.alert-mode .card { border: 1px solid rgba(255,77,109,0.45); box-shadow: 0 0 32px rgba(255,77,109,0.18); animation: alertPulse 1.6s ease-in-out infinite; }
+  body.alert-mode .logo { color: var(--red); }
+  body.alert-mode #alert-banner { display: flex; }
+  @keyframes alertPulse { 0%,100% { box-shadow: 0 0 20px rgba(255,77,109,0.15); } 50% { box-shadow: 0 0 36px rgba(255,77,109,0.35); } }
+  #alert-banner { display: none; grid-column: 1/-1; background: rgba(255,77,109,0.12); border: 1px solid rgba(255,77,109,0.5); color: var(--red); padding: 10px 14px; border-radius: var(--radius); font-weight: 600; font-size: 0.85rem; align-items: center; gap: 10px; }
+  #alert-banner .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); animation: pulse 1s infinite; }
+  #alert-dismiss { margin-left: auto; background: rgba(255,77,109,0.2); color: var(--red); padding: 4px 10px; font-size: 0.7rem; }
+
+  /* Fraud scanner panel */
+  #fraud-panel { }
+  #fraud-row { display: flex; gap: 8px; align-items: center; }
+  #fraud-file-input { display: none; }
+  #fraud-upload-btn { background: rgba(255,77,109,0.15); color: var(--red); padding: 8px 14px; font-size: 0.8rem; border: 1px solid rgba(255,77,109,0.3); }
+  #fraud-upload-btn:hover { background: rgba(255,77,109,0.25); }
+  #fraud-scan-btn { background: var(--red); color: white; padding: 8px 14px; font-size: 0.8rem; }
+  #fraud-scan-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  #fraud-preview { margin-top: 8px; max-height: 120px; border-radius: 6px; object-fit: cover; display: none; width: 100%; }
+  #fraud-result { margin-top: 8px; font-size: 0.72rem; color: var(--muted); min-height: 20px; }
+  #fraud-result .verdict-scam { color: var(--red); font-weight: 700; }
+  #fraud-result .verdict-suspicious { color: var(--yellow); font-weight: 700; }
+  #fraud-result .verdict-safe { color: var(--green); font-weight: 700; }
+
   /* Receipt panel */
   #receipt-panel { }
   #receipt-row { display: flex; gap: 8px; align-items: center; }
@@ -110,6 +134,12 @@
   <div class="spacer"></div>
   <div style="font-size:0.72rem;color:var(--muted);">bunq Hackathon 7.0</div>
 </header>
+
+<div id="alert-banner">
+  <div class="dot"></div>
+  <span id="alert-banner-text">Fraud alert active.</span>
+  <button id="alert-dismiss">Dismiss</button>
+</div>
 
 <!-- LEFT: Chat panel -->
 <div class="card" id="chat-panel">
@@ -145,6 +175,18 @@
     <button id="mic-btn" title="Hold to record">🎙️</button>
     <div id="voice-status">Hold mic to speak</div>
     <div id="transcript-box">Transcript will appear here…</div>
+  </div>
+
+  <!-- Fraud scanner panel -->
+  <div class="card" id="fraud-panel">
+    <h3>Suspicious Message</h3>
+    <div id="fraud-row">
+      <input type="file" id="fraud-file-input" accept="image/*">
+      <button id="fraud-upload-btn">⚠️ Upload Screenshot</button>
+      <button id="fraud-scan-btn" disabled>Scan</button>
+    </div>
+    <img id="fraud-preview" src="" alt="Screenshot preview">
+    <div id="fraud-result">Upload a screenshot of an SMS, email, or chat you're unsure about.</div>
   </div>
 
   <!-- Receipt panel -->
@@ -343,6 +385,72 @@ fileInput.addEventListener('change', () => {
   receiptPreview.style.display = 'block';
   processBtn.disabled = false;
   receiptResult.textContent = 'Ready to process…';
+});
+
+// ── Fraud scanner ─────────────────────────────────────────────────────────────
+const fraudFileInput = document.getElementById('fraud-file-input');
+const fraudUploadBtn = document.getElementById('fraud-upload-btn');
+const fraudScanBtn = document.getElementById('fraud-scan-btn');
+const fraudPreview = document.getElementById('fraud-preview');
+const fraudResult = document.getElementById('fraud-result');
+const alertBanner = document.getElementById('alert-banner');
+const alertBannerText = document.getElementById('alert-banner-text');
+const alertDismiss = document.getElementById('alert-dismiss');
+
+fraudUploadBtn.addEventListener('click', () => fraudFileInput.click());
+fraudFileInput.addEventListener('change', () => {
+  const file = fraudFileInput.files[0];
+  if (!file) return;
+  fraudPreview.src = URL.createObjectURL(file);
+  fraudPreview.style.display = 'block';
+  fraudScanBtn.disabled = false;
+  fraudResult.textContent = 'Ready to scan…';
+});
+
+alertDismiss.addEventListener('click', () => {
+  document.body.classList.remove('alert-mode');
+});
+
+function renderFraudVerdict(analysis) {
+  const v = analysis.verdict;
+  const cls = v === 'scam' ? 'verdict-scam' : v === 'suspicious' ? 'verdict-suspicious' : 'verdict-safe';
+  const flags = (analysis.red_flags || []).map(f => `• ${f}`).join('<br>');
+  fraudResult.innerHTML = `
+    <div class="${cls}">${v.toUpperCase()} · ${(analysis.confidence * 100).toFixed(0)}%</div>
+    <div style="margin-top:4px">${analysis.reasoning || ''}</div>
+    ${flags ? `<div style="margin-top:6px;color:var(--muted);font-size:0.7rem">${flags}</div>` : ''}
+  `;
+}
+
+fraudScanBtn.addEventListener('click', async () => {
+  const file = fraudFileInput.files[0];
+  if (!file) return;
+  fraudScanBtn.disabled = true;
+  fraudResult.textContent = '🔍 Analysing screenshot…';
+
+  const fd = new FormData();
+  fd.append('image', file);
+  try {
+    const r = await fetch(`${BASE}/analyze-message?mock=${isMock}`, { method: 'POST', body: fd });
+    const data = await r.json();
+    renderFraudVerdict(data.analysis || {});
+
+    if (data.is_scam) {
+      document.body.classList.add('alert-mode');
+      alertBannerText.textContent = `Fraud alert: ${data.analysis.verdict.toUpperCase()} — ${data.analysis.reasoning || 'do not interact with this message.'}`;
+      if (data.agent_response) {
+        appendMessage('assistant', '⚠️ ' + data.agent_response, []);
+      }
+      if (data.audio_b64) {
+        new Audio('data:audio/mp3;base64,' + data.audio_b64).play().catch(() => {});
+      }
+    } else {
+      document.body.classList.remove('alert-mode');
+    }
+  } catch(e) {
+    fraudResult.textContent = '⚠️ Scan failed: ' + e.message;
+  }
+  fraudScanBtn.disabled = false;
 });
 
 processBtn.addEventListener('click', async () => {

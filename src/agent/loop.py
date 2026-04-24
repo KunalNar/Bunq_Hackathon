@@ -38,6 +38,7 @@ def run_agent(
     mock_mode: bool = MOCK_MODE,
     max_iterations: int = 10,
     model: str = SMART_MODEL,
+    extra_tools: list[dict] | None = None,
 ) -> tuple[str, list[dict], dict]:
     """
     Run one full agent turn and return when the model produces a text response.
@@ -49,6 +50,10 @@ def run_agent(
         mock_mode:       If True, tool handlers use fixture data (no sandbox).
         max_iterations:  Safety cap on tool-call rounds per turn.
         model:           Claude model ID to use.
+        extra_tools:     Additional Anthropic tool specs to enable for this turn
+                         (e.g. [WEB_SEARCH_TOOL] for fraud verification). Server
+                         tools are executed by Anthropic; our dispatcher never
+                         sees them, so we don't need handlers for them.
 
     Returns:
         (final_text, updated_messages, usage_summary)
@@ -60,6 +65,7 @@ def run_agent(
     tool_calls_made: list[dict] = []  # collected for the caller / UI
     total_usage = {"input_tokens": 0, "output_tokens": 0}
     new_messages: list[dict] = []  # messages added this turn
+    effective_tools = TOOL_DEFINITIONS + (extra_tools or [])
 
     for iteration in range(max_iterations):
         # ── Call the model ─────────────────────────────────────────────────────
@@ -67,7 +73,7 @@ def run_agent(
             model=model,
             max_tokens=4096,
             system=SYSTEM_PROMPT,
-            tools=TOOL_DEFINITIONS,
+            tools=effective_tools,
             messages=messages + new_messages,
         )
 
@@ -84,10 +90,11 @@ def run_agent(
 
         # ── Done? ──────────────────────────────────────────────────────────────
         if response.stop_reason == "end_turn":
-            # Extract the last text block as the final response
-            final_text = next(
-                (block.text for block in response.content if hasattr(block, "text")),
-                "",
+            # Join ALL text blocks. With server tools like web_search, the model
+            # may emit text before and after tool results — taking only the first
+            # block would drop the actual answer.
+            final_text = "".join(
+                block.text for block in response.content if hasattr(block, "text")
             )
             return final_text, new_messages, total_usage
 

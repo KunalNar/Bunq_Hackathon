@@ -183,15 +183,14 @@ async def receipt(
     is_mock = _mock_flag(mock)
     img_bytes = await image.read()
     img_b64 = base64.b64encode(img_bytes).decode()
+    media_type = image.content_type or "image/jpeg"
 
-    if is_mock:
-        # Use mock handler (returns canned receipt data)
-        parsed = execute_tool("parse_receipt", {"image_base64": img_b64}, mock_mode=True)
-    else:
-        # Real vision call
-        from src.vision.receipt_parser import parse_receipt_image
-        receipt_data = parse_receipt_image(image_base64=img_b64)
-        parsed = receipt_data.model_dump()
+    # Always run vision on the real uploaded image — mocking vision would make
+    # the UI feel broken (user uploads X, gets back Y). mock_mode below still
+    # governs the downstream banking actions (split, request, categorize).
+    from src.vision.receipt_parser import parse_receipt_image
+    receipt_data = parse_receipt_image(image_base64=img_b64, media_type=media_type)
+    parsed = receipt_data.model_dump()
 
     result = {"parsed_receipt": parsed, "mock_mode": is_mock}
 
@@ -209,6 +208,68 @@ async def receipt(
         result["usage"] = usage
 
     return result
+
+
+@app.post("/analyze-message")
+async def analyze_message(
+    image: UploadFile = File(...),
+    mock: Optional[str] = Query(None),
+):
+    """
+    Run the fraud-detection pipeline on a screenshot of a suspicious message.
+
+    Steps:
+      1. Claude Vision extracts sender / text / URLs / red flags / verdict.
+      2. If the verdict is alarming, the agent is invoked with a prompt that
+         includes the analysis + Anthropic's web_search tool for brand
+         verification; it returns a short spoken warning.
+      3. The warning is TTS'd in "urgent" mode (graver voice, slightly slower).
+
+    The `is_scam` flag in the response tells the UI to flip into red-alert mode.
+    """
+    from src.agent.prompts import build_fraud_analysis_prompt
+    from src.agent.tools import WEB_SEARCH_TOOL
+    from src.speech.tts import speak
+    from src.vision.fraud_analyzer import analyze_suspicious_message
+
+    is_mock = _mock_flag(mock)
+    img_bytes = await image.read()
+    img_b64 = base64.b64encode(img_bytes).decode()
+    media_type = image.content_type or "image/jpeg"
+
+    analysis = analyze_suspicious_message(image_base64=img_b64, media_type=media_type)
+    logger.info(
+        f"[analyze-message] verdict={analysis.verdict} "
+        f"confidence={analysis.confidence:.2f} flags={analysis.red_flags}"
+    )
+
+    agent_text = ""
+    audio_b64 = ""
+    usage = {}
+    if analysis.is_alarming:
+        global _conversation
+        prompt = build_fraud_analysis_prompt(analysis.model_dump())
+        _conversation.append({"role": "user", "content": prompt})
+        agent_text, new_messages, usage = run_agent(
+            _conversation,
+            mock_mode=is_mock,
+            extra_tools=[WEB_SEARCH_TOOL],
+        )
+        _conversation.extend(new_messages)
+        try:
+            audio_bytes = speak(agent_text, urgent=True)
+            audio_b64 = base64.b64encode(audio_bytes).decode()
+        except Exception as exc:
+            logger.warning(f"[analyze-message] TTS failed: {exc}")
+
+    return {
+        "is_scam": analysis.is_alarming,
+        "analysis": analysis.model_dump(),
+        "agent_response": agent_text,
+        "audio_b64": audio_b64,
+        "usage": usage,
+        "mock_mode": is_mock,
+    }
 
 
 @app.post("/reset")

@@ -192,3 +192,13 @@ TOOL_DEFINITIONS = [
         },
     },
 ]
+
+# Anthropic-hosted server tool for live web lookups. Opt-in: callers pass this
+# into run_agent via `extra_tools=[WEB_SEARCH_TOOL]` only on flows that need it
+# (the fraud analyzer uses it to verify brand phrases). Kept out of the default
+# tool list so normal banking turns don't incur search cost or latency.
+WEB_SEARCH_TOOL = {
+    "type": "web_search_20250305",
+    "name": "web_search",
+    "max_uses": 3,
+}
