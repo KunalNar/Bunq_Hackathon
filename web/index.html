@@ -164,7 +164,8 @@
 <script>
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const BASE = '';  // same origin
-let isMock = true;
+const urlMode = new URLSearchParams(window.location.search).get('mock');
+let isMock = urlMode === null ? null : ['true', '1', 'yes'].includes(urlMode.toLowerCase());
 
 function now() {
   return new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
@@ -175,10 +176,17 @@ function categoryIcon(cat) {
   return icons[cat] || '📦';
 }
 
+function apiUrl(path) {
+  if (isMock === null) {
+    return `${BASE}${path}`;
+  }
+  return `${BASE}${path}?mock=${isMock}`;
+}
+
 // ── Account state refresh ─────────────────────────────────────────────────────
 async function refreshState() {
   try {
-    const r = await fetch(`${BASE}/state?mock=${isMock}`);
+    const r = await fetch(apiUrl('/state'));
     const data = await r.json();
     isMock = data.mock_mode;
     document.getElementById('mode-badge').className = `badge ${isMock ? 'mock' : 'live'}`;
@@ -242,7 +250,7 @@ async function sendMessage(text) {
   document.getElementById('messages').scrollTop = 99999;
 
   try {
-    const r = await fetch(`${BASE}/chat?mock=${isMock}`, {
+    const r = await fetch(apiUrl('/chat'), {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({message: text}),
@@ -308,7 +316,7 @@ async function stopRecording() {
     const fd = new FormData();
     fd.append('audio', blob, 'recording.webm');
     try {
-      const r = await fetch(`${BASE}/voice?mock=${isMock}`, { method: 'POST', body: fd });
+      const r = await fetch(apiUrl('/voice'), { method: 'POST', body: fd });
       const data = await r.json();
       transcriptBox.textContent = data.transcript || '(no transcript)';
       appendMessage('user', data.transcript || '(voice)', []);
@@ -355,7 +363,7 @@ processBtn.addEventListener('click', async () => {
   fd.append('num_people', '1');
   fd.append('run_agent_flag', 'true');
   try {
-    const r = await fetch(`${BASE}/receipt?mock=${isMock}`, { method: 'POST', body: fd });
+    const r = await fetch(apiUrl('/receipt'), { method: 'POST', body: fd });
     const data = await r.json();
     const rec = data.parsed_receipt;
     receiptResult.innerHTML = `<b>${rec.merchant || 'Unknown'}</b> — €${rec.total ?? '?'} · ${rec.date || 'no date'}`;

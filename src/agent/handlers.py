@@ -158,16 +158,49 @@ def _get_bunq_context():
         raise RuntimeError(f"bunq SDK not initialised. Run scripts/seed_sandbox.py first. ({exc})")
 
 
+def _get_primary_account():
+    from bunq.sdk.model.generated.endpoint import MonetaryAccountBankApiObject
+
+    accounts = MonetaryAccountBankApiObject.list().value
+    if not accounts:
+        return None
+    return accounts[0]
+
+
+def _get_bunq_user_display_name():
+    from bunq.sdk.model.generated.endpoint import UserApiObject
+
+    users = UserApiObject.list().value
+    if not users:
+        return None
+
+    user = users[0].get_referenced_object()
+    display_name = getattr(user, "display_name", None)
+    if display_name:
+        return display_name
+
+    public_nick_name = getattr(user, "public_nick_name", None)
+    if public_nick_name:
+        return public_nick_name
+
+    parts = [
+        getattr(user, "first_name", None),
+        getattr(user, "middle_name", None),
+        getattr(user, "last_name", None),
+    ]
+    full_name = " ".join(part for part in parts if part)
+    return full_name or None
+
+
 def _real_get_balance(_args: dict) -> dict:
     _get_bunq_context()
-    from bunq.sdk.model.generated.endpoint import MonetaryAccount
 
-    accounts = MonetaryAccount.list().value
-    if not accounts:
+    acct = _get_primary_account()
+    if not acct:
         return {"error": "No accounts found"}
-    acct = accounts[0].MonetaryAccountBank
+    account_name = _get_bunq_user_display_name() or acct.display_name or acct.description
     return {
-        "account_name": acct.description,
+        "account_name": account_name,
         "iban": next(
             (a.value for a in acct.alias if a.type_ == "IBAN"), "unknown"
         ),
@@ -177,12 +210,14 @@ def _real_get_balance(_args: dict) -> dict:
 
 def _real_list_transactions(args: dict) -> dict:
     _get_bunq_context()
-    from bunq.sdk.model.generated.endpoint import MonetaryAccount, Payment
+    from bunq.sdk.model.generated.endpoint import PaymentApiObject
 
-    accounts = MonetaryAccount.list().value
-    account_id = accounts[0].MonetaryAccountBank.id_
+    acct = _get_primary_account()
+    if not acct:
+        return {"transactions": [], "total_returned": 0}
+    account_id = acct.id_
     limit = min(args.get("limit", 10), 50)
-    payments = Payment.list(monetary_account_id=account_id).value[:limit]
+    payments = PaymentApiObject.list(monetary_account_id=account_id).value[:limit]
     txns = []
     for p in payments:
         txns.append({
@@ -201,16 +236,17 @@ def _real_list_transactions(args: dict) -> dict:
 
 def _real_create_payment(args: dict) -> dict:
     _get_bunq_context()
-    from bunq.sdk.model.generated.endpoint import MonetaryAccount, Payment
-    from bunq.sdk.model.generated.object_ import Amount, Pointer
+    from bunq.sdk.model.generated.endpoint import PaymentApiObject
+    from bunq.sdk.model.generated.object_ import AmountObject, PointerObject
 
-    accounts = MonetaryAccount.list().value
-    account_id = accounts[0].MonetaryAccountBank.id_
-    payment_id = Payment.create(
-        amount=Amount(str(args["amount_eur"]), "EUR"),
-        counterparty_alias=Pointer("IBAN", args["to_iban"]),
+    acct = _get_primary_account()
+    if not acct:
+        return {"status": "ERROR", "error": "No accounts found"}
+    payment_id = PaymentApiObject.create(
+        amount=AmountObject(str(args["amount_eur"]), "EUR"),
+        counterparty_alias=PointerObject("IBAN", args["to_iban"]),
         description=args["description"],
-        monetary_account_id=account_id,
+        monetary_account_id=acct.id_,
     ).value
     return {
         "status": "SUCCESS",
@@ -223,17 +259,18 @@ def _real_create_payment(args: dict) -> dict:
 
 def _real_create_request_inquiry(args: dict) -> dict:
     _get_bunq_context()
-    from bunq.sdk.model.generated.endpoint import MonetaryAccount, RequestInquiry
-    from bunq.sdk.model.generated.object_ import Amount, Pointer
+    from bunq.sdk.model.generated.endpoint import RequestInquiryApiObject
+    from bunq.sdk.model.generated.object_ import AmountObject, PointerObject
 
-    accounts = MonetaryAccount.list().value
-    account_id = accounts[0].MonetaryAccountBank.id_
-    req_id = RequestInquiry.create(
-        amount_inquired=Amount(str(args["amount_eur"]), "EUR"),
-        counterparty_alias=Pointer("EMAIL", args["to_email"]),
+    acct = _get_primary_account()
+    if not acct:
+        return {"status": "ERROR", "error": "No accounts found"}
+    req_id = RequestInquiryApiObject.create(
+        amount_inquired=AmountObject(str(args["amount_eur"]), "EUR"),
+        counterparty_alias=PointerObject("EMAIL", args["to_email"]),
         description=args["description"],
         allow_bunqme=True,
-        monetary_account_id=account_id,
+        monetary_account_id=acct.id_,
     ).value
     return {
         "status": "SENT",
@@ -250,14 +287,14 @@ def _real_categorize_transaction(args: dict) -> dict:
 
 def _real_create_savings_goal(args: dict) -> dict:
     _get_bunq_context()
-    from bunq.sdk.model.generated.endpoint import MonetaryAccountSavings
-    from bunq.sdk.model.generated.object_ import Amount
+    from bunq.sdk.model.generated.endpoint import MonetaryAccountSavingsApiObject
+    from bunq.sdk.model.generated.object_ import AmountObject
 
     target = args.get("target_eur")
-    savings_id = MonetaryAccountSavings.create(
+    savings_id = MonetaryAccountSavingsApiObject.create(
         currency="EUR",
         description=args["name"],
-        savings_goal=Amount(str(target), "EUR") if target else None,
+        savings_goal=AmountObject(str(target), "EUR") if target else None,
     ).value
     return {
         "status": "CREATED",

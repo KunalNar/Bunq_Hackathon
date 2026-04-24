@@ -33,12 +33,11 @@ try:
     from bunq.sdk.context.api_environment_type import ApiEnvironmentType
     from bunq.sdk.context.bunq_context import BunqContext
     from bunq.sdk.model.generated.endpoint import (
-        MonetaryAccount,
-        MonetaryAccountSavings,
-        Payment,
-        SandboxUser,
+        MonetaryAccountBankApiObject,
+        MonetaryAccountSavingsApiObject,
+        PaymentApiObject,
     )
-    from bunq.sdk.model.generated.object_ import Amount, Pointer
+    from bunq.sdk.model.generated.object_ import AmountObject, PointerObject
 except ImportError:
     print("ERROR: bunq-sdk not installed. Run: pip install bunq-sdk")
     sys.exit(1)
@@ -99,9 +98,9 @@ def create_transactions(account_id: int) -> None:
     print(f"Creating {len(transactions)} transactions on account {account_id}…")
     for iban, amount, desc in transactions:
         try:
-            Payment.create(
-                amount=Amount(amount.lstrip("-"), "EUR"),
-                counterparty_alias=Pointer("IBAN", iban, "Demo Merchant"),
+            PaymentApiObject.create(
+                amount=AmountObject(amount.lstrip("-"), "EUR"),
+                counterparty_alias=PointerObject("IBAN", iban, "Demo Merchant"),
                 description=desc,
                 monetary_account_id=account_id,
             )
@@ -116,12 +115,12 @@ def main() -> None:
     ctx = create_context()
 
     # Get primary user
-    accounts = MonetaryAccount.list().value
+    accounts = MonetaryAccountBankApiObject.list().value
     if not accounts:
         print("ERROR: No accounts found. Check your BUNQ_API_KEY.")
         sys.exit(1)
 
-    primary = accounts[0].MonetaryAccountBank
+    primary = accounts[0]
     account_id = primary.id_
     print(f"Primary account: {primary.description} (ID: {account_id})")
 
@@ -130,10 +129,10 @@ def main() -> None:
 
     # Create savings sub-account
     try:
-        savings_id = MonetaryAccountSavings.create(
+        savings_id = MonetaryAccountSavingsApiObject.create(
             currency="EUR",
             description="Holiday Fund 🌴",
-            savings_goal=Amount("500.00", "EUR"),
+            savings_goal=AmountObject("500.00", "EUR"),
         ).value
         print(f"Created savings account 'Holiday Fund' (ID: {savings_id})")
     except Exception as e:
