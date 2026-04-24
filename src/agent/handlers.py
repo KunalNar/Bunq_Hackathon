@@ -175,7 +175,6 @@ def _real_get_balance(_args: dict) -> dict:
         "currency": acct.balance.currency,
     }
 
-
 def _real_list_transactions(args: dict) -> dict:
     _get_bunq_context()
     from bunq.sdk.model.generated.endpoint import MonetaryAccount, Payment
