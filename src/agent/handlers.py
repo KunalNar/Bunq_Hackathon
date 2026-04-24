@@ -192,6 +192,38 @@ def _get_bunq_user_display_name():
     return full_name or None
 
 
+def _get_counterparty_name(counterparty_alias, description: str | None = None) -> str:
+    if not counterparty_alias:
+        return description or "Unknown counterparty"
+
+    label = getattr(counterparty_alias, "label_monetary_account", None)
+    if label:
+        display_name = getattr(label, "display_name", None)
+        if display_name:
+            return display_name
+
+        label_user = getattr(label, "label_user", None)
+        user_display_name = getattr(label_user, "display_name", None)
+        if user_display_name:
+            return user_display_name
+
+        iban = getattr(label, "iban", None)
+        if iban:
+            return iban
+
+    pointer = getattr(counterparty_alias, "pointer", None)
+    if pointer:
+        pointer_name = getattr(pointer, "name", None)
+        if pointer_name:
+            return pointer_name
+
+        pointer_value = getattr(pointer, "value", None)
+        if pointer_value:
+            return pointer_value
+
+    return description or "Unknown counterparty"
+
+
 def _real_get_balance(_args: dict) -> dict:
     _get_bunq_context()
 
@@ -223,7 +255,7 @@ def _real_list_transactions(args: dict) -> dict:
         txns.append({
             "id": str(p.id_),
             "date": str(p.created)[:10],
-            "merchant": p.counterparty_alias.display_name,
+            "merchant": _get_counterparty_name(p.counterparty_alias, p.description),
             "amount_eur": float(p.amount.value),
             "description": p.description,
             "category": "other",

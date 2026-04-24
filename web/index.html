@@ -277,6 +277,7 @@ document.getElementById('chat-input').addEventListener('keydown', e => {
 // ── Voice (hold-to-record) ────────────────────────────────────────────────────
 let mediaRecorder = null;
 let audioChunks = [];
+let recorderMimeType = '';
 const micBtn = document.getElementById('mic-btn');
 const voiceStatus = document.getElementById('voice-status');
 const transcriptBox = document.getElementById('transcript-box');
@@ -287,12 +288,32 @@ micBtn.addEventListener('mouseup', stopRecording);
 micBtn.addEventListener('mouseleave', stopRecording);
 micBtn.addEventListener('touchend', stopRecording);
 
+function preferredRecorderMimeType() {
+  const candidates = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/mp4',
+    'audio/ogg;codecs=opus',
+  ];
+  return candidates.find(type => window.MediaRecorder?.isTypeSupported?.(type)) || '';
+}
+
+function audioExtension(mimeType) {
+  if (mimeType.includes('mp4')) return 'm4a';
+  if (mimeType.includes('ogg')) return 'ogg';
+  if (mimeType.includes('wav')) return 'wav';
+  return 'webm';
+}
+
 async function startRecording() {
   if (mediaRecorder) return;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     audioChunks = [];
-    mediaRecorder = new MediaRecorder(stream);
+    recorderMimeType = preferredRecorderMimeType();
+    mediaRecorder = recorderMimeType
+      ? new MediaRecorder(stream, { mimeType: recorderMimeType })
+      : new MediaRecorder(stream);
     mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
     mediaRecorder.start();
     micBtn.classList.add('recording');
@@ -309,22 +330,28 @@ async function stopRecording() {
   voiceStatus.textContent = 'Processing…';
 
   mediaRecorder.onstop = async () => {
-    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+    const mimeType = mediaRecorder.mimeType || recorderMimeType || audioChunks[0]?.type || 'audio/webm';
+    const blob = new Blob(audioChunks, { type: mimeType });
+    const filename = `recording.${audioExtension(mimeType)}`;
     mediaRecorder.stream.getTracks().forEach(t => t.stop());
     mediaRecorder = null;
+    recorderMimeType = '';
 
     const fd = new FormData();
-    fd.append('audio', blob, 'recording.webm');
+    fd.append('audio', blob, filename);
     try {
       const r = await fetch(apiUrl('/voice'), { method: 'POST', body: fd });
-      const data = await r.json();
+      const data = await r.json().catch(async () => ({ error: await r.text() }));
+      if (!r.ok) {
+        throw new Error(data.error || 'Voice processing failed');
+      }
       transcriptBox.textContent = data.transcript || '(no transcript)';
       appendMessage('user', data.transcript || '(voice)', []);
       appendMessage('assistant', data.response || '', []);
       voiceStatus.textContent = 'Done. Hold mic to speak again.';
       // Play TTS audio
       if (data.audio_b64) {
-        const audio = new Audio('data:audio/mp3;base64,' + data.audio_b64);
+        const audio = new Audio(`data:${data.audio_mime || 'audio/mpeg'};base64,${data.audio_b64}`);
         audio.play().catch(() => {});
       }
       await refreshState();

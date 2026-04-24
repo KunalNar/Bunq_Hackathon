@@ -23,6 +23,11 @@ _USE_LOCAL = os.environ.get("USE_LOCAL_WHISPER", "false").lower() in ("true", "1
 _LOCAL_MODEL_SIZE = os.environ.get("WHISPER_MODEL", "base")  # tiny/base/small/medium
 
 
+def _has_usable_openai_key() -> bool:
+    key = (OPENAI_API_KEY or "").strip()
+    return key.startswith("sk-") and key not in {"sk-", "sk-..", "sk-..."} and len(key) > 20
+
+
 def transcribe(audio_path: str | Path) -> str:
     """
     Transcribe an audio file to text.
@@ -37,7 +42,7 @@ def transcribe(audio_path: str | Path) -> str:
     if not audio_path.exists():
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
-    if _USE_LOCAL:
+    if _USE_LOCAL or not _has_usable_openai_key():
         return _transcribe_local(audio_path)
     return _transcribe_openai(audio_path)
 

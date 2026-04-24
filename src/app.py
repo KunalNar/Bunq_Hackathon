@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, Query, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from src.agent.handlers import execute_tool
@@ -131,42 +131,62 @@ async def voice(
     and return the response text + base64-encoded TTS audio.
     """
     from src.speech.asr import transcribe
-    from src.speech.tts import speak
+    from src.speech.tts import audio_mime_type, speak
 
     is_mock = _mock_flag(mock)
-
-    # Save upload to temp file for Whisper
-    suffix = Path(audio.filename or "audio.wav").suffix or ".wav"
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        tmp.write(await audio.read())
-        tmp_path = tmp.name
+    tmp_path = None
 
     try:
-        transcript = transcribe(tmp_path)
+        # Save upload to temp file for Whisper
+        suffix = Path(audio.filename or "audio.wav").suffix or ".wav"
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(await audio.read())
+            tmp_path = tmp.name
+
+        transcript = transcribe(tmp_path).strip()
         logger.info(f"[voice] transcript: {transcript!r}")
+        if not transcript:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "No speech detected. Try speaking closer to the mic or for a bit longer.",
+                    "mock_mode": is_mock,
+                },
+            )
+
+        # Run agent with the transcript
+        global _conversation
+        _conversation.append({"role": "user", "content": transcript})
+        final_text, new_messages, usage = run_agent(
+            _conversation,
+            mock_mode=is_mock,
+        )
+        _conversation.extend(new_messages)
+
+        # Convert response to speech
+        audio_bytes = speak(final_text)
+        audio_b64 = base64.b64encode(audio_bytes).decode()
+
+        return {
+            "transcript": transcript,
+            "response": final_text,
+            "audio_b64": audio_b64,
+            "audio_mime": audio_mime_type(),
+            "mock_mode": is_mock,
+            "usage": usage,
+        }
+    except Exception as exc:
+        logger.exception("[voice] processing failed")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": f"Voice processing failed: {exc}",
+                "mock_mode": is_mock,
+            },
+        )
     finally:
-        os.unlink(tmp_path)
-
-    # Run agent with the transcript
-    global _conversation
-    _conversation.append({"role": "user", "content": transcript})
-    final_text, new_messages, usage = run_agent(
-        _conversation,
-        mock_mode=is_mock,
-    )
-    _conversation.extend(new_messages)
-
-    # Convert response to speech
-    audio_bytes = speak(final_text)
-    audio_b64 = base64.b64encode(audio_bytes).decode()
-
-    return {
-        "transcript": transcript,
-        "response": final_text,
-        "audio_b64": audio_b64,
-        "mock_mode": is_mock,
-        "usage": usage,
-    }
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 
 @app.post("/receipt")
