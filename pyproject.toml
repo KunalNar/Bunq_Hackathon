@@ -31,6 +31,9 @@ dev = [
 offline = [
     "faster-whisper>=1.0.0",
 ]
+kokoro = [
+    "kokoro>=0.9.4",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
