@@ -255,6 +255,95 @@ TOOL_DEFINITIONS = [
             "required": ["action_description"],
         },
     },
+    # ── Shoe price-watch tools ─────────────────────────────────────────────────
+    {
+        "name": "identify_shoe_from_image",
+        "description": (
+            "Uses Claude Vision to identify a shoe from a photo and return a canonical "
+            "product name (e.g. 'Nike Air Max 90 White/Black'). "
+            "Call this BEFORE watch_shoe_price when the user holds a shoe up to the camera. "
+            "Present the identified name to the user and let them confirm or refine it "
+            "before setting up the watch."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "image_base64": {
+                    "type": "string",
+                    "description": "Base64-encoded shoe photo (JPEG or PNG).",
+                },
+            },
+            "required": ["image_base64"],
+        },
+    },
+    {
+        "name": "watch_shoe_price",
+        "description": (
+            "Sets up a background price watch for a shoe across Nike and Zalando. "
+            "Automatically buys the shoe when its price drops to threshold_eur or below. "
+            "The max_price_eur acts as the pre-authorization ceiling — agreeing to the watch "
+            "IS the confirmation; no second prompt fires at purchase time. "
+            "When a threshold is met the avatar narrates 'Found it — buying in 30 seconds. "
+            "Say cancel to stop.' and the user has 30 seconds to cancel. "
+            "Always confirm shoe_name, threshold_eur, and max_price_eur with the user "
+            "before calling this tool."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "shoe_name": {
+                    "type": "string",
+                    "description": "Canonical shoe name (e.g. 'Nike Air Max 90').",
+                },
+                "threshold_eur": {
+                    "type": "number",
+                    "description": "Buy automatically when price drops to this amount or below (EUR).",
+                    "exclusiveMinimum": 0,
+                },
+                "max_price_eur": {
+                    "type": "number",
+                    "description": (
+                        "User's pre-authorized spending ceiling. Must be >= threshold_eur. "
+                        "No purchase will exceed this amount."
+                    ),
+                    "exclusiveMinimum": 0,
+                },
+            },
+            "required": ["shoe_name", "threshold_eur", "max_price_eur"],
+        },
+    },
+    {
+        "name": "list_shoe_watches",
+        "description": (
+            "Returns all shoe price watches for the current user — active, triggered, "
+            "cancelled, and completed. Use this when the user asks what is being watched, "
+            "wants to check current prices, or needs a watch ID to cancel."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "cancel_shoe_watch",
+        "description": (
+            "Cancels a shoe price watch by its ID. "
+            "If the watch is currently in the 30-second grace window (status='triggered'), "
+            "this also aborts the pending auto-purchase. "
+            "Call list_shoe_watches first if the user doesn't know the watch ID."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "watch_id": {
+                    "type": "string",
+                    "description": "The 8-character watch ID returned by watch_shoe_price.",
+                },
+            },
+            "required": ["watch_id"],
+        },
+    },
 ]
 
 # Anthropic-hosted server tool for live web lookups. Opt-in: callers pass this

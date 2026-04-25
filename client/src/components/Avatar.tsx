@@ -3,9 +3,16 @@ import { useEffect, useRef } from 'react'
 interface Props {
   speaking: boolean
   listening: boolean
+  thinking?: boolean
+  /** Pixel size of the avatar's bounding box. Default 200 (50% bigger ≈ 300). */
+  size?: number
+  /** Hide the "Finn / by bunq" caption when the surrounding hero owns its own copy. */
+  showCaption?: boolean
 }
 
-export default function Avatar({ speaking, listening }: Props) {
+export default function Avatar({
+  speaking, listening, thinking = false, size = 200, showCaption = true,
+}: Props) {
   const mouthOuterRef = useRef<SVGEllipseElement>(null)
   const mouthInnerRef = useRef<SVGEllipseElement>(null)
   const mouthTeethRef = useRef<SVGEllipseElement>(null)
@@ -75,26 +82,39 @@ export default function Avatar({ speaking, listening }: Props) {
     ? 'drop-shadow(0 0 24px rgba(0,220,132,0.75))'
     : listening
     ? 'drop-shadow(0 0 24px rgba(255,77,109,0.65))'
+    : thinking
+    ? 'drop-shadow(0 0 22px rgba(255,214,10,0.55))'
     : 'drop-shadow(0 0 12px rgba(0,220,132,0.2))'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
 
-      {/* Outer wrapper: listening tilt */}
+      {/* Outer wrapper: listening tilt, thinking tilt-up */}
       <div style={{
-        transform: listening ? 'rotate(-4deg)' : 'rotate(0deg)',
+        transform: listening ? 'rotate(-4deg)' : thinking ? 'rotate(3deg) translateY(-2px)' : 'rotate(0deg)',
         transition: 'transform 0.4s ease',
       }}>
         {/* Inner wrapper: idle float or speaking bob */}
         <div style={{
-          width: 200,
-          height: 220,
+          position: 'relative',
+          width: size,
+          height: Math.round(size * 1.10),
           animation: speaking
             ? 'avatarBob 0.42s ease-in-out infinite alternate'
             : 'avatarFloat 3.5s ease-in-out infinite',
           filter: glow,
           transition: 'filter 0.35s ease',
         }}>
+          {/* Thinking orbit — only visible while thinking */}
+          {thinking && (
+            <div style={{
+              position: 'absolute', inset: -8,
+              borderRadius: '50%',
+              border: '2px dashed rgba(255,214,10,0.55)',
+              animation: 'thinking-orbit 4s linear infinite',
+              pointerEvents: 'none',
+            }} />
+          )}
           <svg viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg"
                style={{ width: '100%', height: '100%' }}>
 
@@ -162,12 +182,17 @@ export default function Avatar({ speaking, listening }: Props) {
       </div>
 
       {/* ── Name tag ── */}
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text)' }}>Finn</div>
-        <div style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: 2 }}>
-          {speaking ? '🔊 Speaking…' : listening ? '🎙️ Listening…' : 'by bunq'}
+      {showCaption && (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text)' }}>Finn</div>
+          <div style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: 2 }}>
+            {speaking ? '🔊 Speaking…'
+              : listening ? '🎙️ Listening…'
+              : thinking ? '💭 Thinking…'
+              : 'by bunq'}
+          </div>
         </div>
-      </div>
+      )}
 
       <style>{`
         @keyframes avatarFloat {
