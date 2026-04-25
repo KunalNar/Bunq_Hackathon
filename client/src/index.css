@@ -1,0 +1,19 @@
+:root {
+  --green: #00DC84;
+  --dark: #1A1A2E;
+  --darker: #0F0F1A;
+  --card: #242438;
+  --text: #E8E8F0;
+  --muted: #8888A8;
+  --red: #FF4D6D;
+  --yellow: #FFD60A;
+  --radius: 12px;
+  --font: 'Inter', system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--darker); color: var(--text); font-family: var(--font); }
+button { border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.15s; }
+#root { height: 100vh; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }

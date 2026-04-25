@@ -51,6 +51,25 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "lookup_contact",
+        "description": (
+            "Looks up a contact by first name or full name and returns their IBAN and email. "
+            "ALWAYS call this before create_payment when the user says a person's name — "
+            "you need the IBAN to make a payment. Returns a list of matches; if multiple "
+            "contacts share the name, show the options and ask the user to confirm which one."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "First name or full name of the contact to look up.",
+                },
+            },
+            "required": ["name"],
+        },
+    },
+    {
         "name": "create_payment",
         "description": (
             "Transfers money from the user's bunq account to another IBAN. "
@@ -128,6 +147,44 @@ TOOL_DEFINITIONS = [
                 },
             },
             "required": ["transaction_id", "category"],
+        },
+    },
+    {
+        "name": "list_savings_goals",
+        "description": (
+            "Returns all savings jars (sub-accounts) on the user's bunq account, "
+            "including the jar name, current balance, savings target (if set), "
+            "and how much is still needed to reach the goal. "
+            "Use this when the user asks about their savings, funds, jars, or goals."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "top_up_savings_goal",
+        "description": (
+            "Moves money from the user's main account into one of their savings jars. "
+            "Use this when the user wants to add money to a savings goal or fund by name. "
+            "Always call list_savings_goals first to confirm the jar exists and show the "
+            "current balance. Confirm the jar name, amount, and new balance before calling this."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "jar_name": {
+                    "type": "string",
+                    "description": "Name of the savings jar to top up (e.g. 'Holiday Fund').",
+                },
+                "amount_eur": {
+                    "type": "number",
+                    "description": "Amount in EUR to move into the jar (must be positive).",
+                    "exclusiveMinimum": 0,
+                },
+            },
+            "required": ["jar_name", "amount_eur"],
         },
     },
     {

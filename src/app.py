@@ -26,6 +26,7 @@ from typing import Optional
 
 from fastapi import FastAPI, File, Form, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from src.agent.handlers import execute_tool
@@ -45,6 +46,11 @@ app = FastAPI(title="bunq Hackathon Assistant", version="0.1.0")
 _conversation: list[dict] = []
 
 WEB_DIR = Path(__file__).parent.parent / "web"
+DIST_DIR = WEB_DIR / "dist"
+
+# Serve React build assets if the dist folder exists
+if DIST_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=str(DIST_DIR / "assets")), name="assets")
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -60,11 +66,24 @@ def _mock_flag(mock: Optional[str]) -> bool:
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_ui():
-    """Serve the single-file demo UI."""
+    """Serve the React build if available, otherwise the legacy single-file UI."""
+    dist_index = DIST_DIR / "index.html"
+    if dist_index.exists():
+        return HTMLResponse(dist_index.read_text())
     index = WEB_DIR / "index.html"
     if not index.exists():
         return HTMLResponse("<h1>UI not found. Run from project root.</h1>", status_code=404)
     return HTMLResponse(index.read_text())
+
+
+@app.get("/avatar.png")
+async def serve_avatar():
+    """Serve the avatar image for the React app."""
+    from fastapi.responses import FileResponse
+    avatar = Path(__file__).parent.parent / "public" / "assets" / "avatar.png"
+    if avatar.exists():
+        return FileResponse(str(avatar))
+    return HTMLResponse("not found", status_code=404)
 
 
 @app.get("/state")

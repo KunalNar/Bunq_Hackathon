@@ -79,6 +79,12 @@ else
   echo "🟡 MOCK MODE — using fixture data (safe for demo)"
 fi
 
+# ── Build React UI ────────────────────────────────────────────────────────────
+if [ -d "client" ] && command -v npm &>/dev/null; then
+  echo "Building React UI…"
+  (cd client && npm install -q && npm run build 2>&1 | tail -3)
+fi
+
 # ── Start server ──────────────────────────────────────────────────────────────
 echo ""
 echo "Starting Finn on http://localhost:$PORT"
