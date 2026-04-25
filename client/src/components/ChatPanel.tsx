@@ -1,10 +1,73 @@
 import { useEffect, useRef } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 export interface Message {
   role: 'user' | 'assistant'
   text: string
   timestamp: string
   toolCalls?: { name: string; args: unknown }[]
+}
+
+// Markdown renderer with element-level styling matching the dark UI.
+// Kept inline so there's no extra CSS file to manage.
+function MarkdownMessage({ text }: { text: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        p: ({ children }) => <p style={{ margin: '0 0 8px 0' }}>{children}</p>,
+        h1: ({ children }) => <h3 style={{ margin: '8px 0 6px', fontSize: '1rem', fontWeight: 700 }}>{children}</h3>,
+        h2: ({ children }) => <h4 style={{ margin: '8px 0 6px', fontSize: '0.95rem', fontWeight: 700 }}>{children}</h4>,
+        h3: ({ children }) => <h5 style={{ margin: '8px 0 4px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--green)' }}>{children}</h5>,
+        ul: ({ children }) => <ul style={{ margin: '4px 0 8px', paddingLeft: 18 }}>{children}</ul>,
+        ol: ({ children }) => <ol style={{ margin: '4px 0 8px', paddingLeft: 20 }}>{children}</ol>,
+        li: ({ children }) => <li style={{ margin: '2px 0' }}>{children}</li>,
+        strong: ({ children }) => <strong style={{ color: 'var(--text)', fontWeight: 700 }}>{children}</strong>,
+        em: ({ children }) => <em style={{ color: 'var(--muted)' }}>{children}</em>,
+        hr: () => <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.08)', margin: '10px 0' }} />,
+        code: ({ children }) => (
+          <code style={{
+            background: 'rgba(255,255,255,0.08)', borderRadius: 4,
+            padding: '1px 6px', fontSize: '0.82em', fontFamily: 'ui-monospace, monospace',
+          }}>{children}</code>
+        ),
+        a: ({ href, children }) => (
+          <a href={href} target="_blank" rel="noreferrer" style={{ color: 'var(--green)' }}>{children}</a>
+        ),
+        table: ({ children }) => (
+          <div style={{ overflowX: 'auto', margin: '6px 0 10px' }}>
+            <table style={{
+              width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem',
+              background: 'rgba(255,255,255,0.03)', borderRadius: 6, overflow: 'hidden',
+            }}>{children}</table>
+          </div>
+        ),
+        thead: ({ children }) => (
+          <thead style={{ background: 'rgba(0,220,132,0.08)' }}>{children}</thead>
+        ),
+        th: ({ children }) => (
+          <th style={{
+            textAlign: 'left', padding: '8px 10px',
+            fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.04em',
+            textTransform: 'uppercase', color: 'var(--green)',
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+          }}>{children}</th>
+        ),
+        td: ({ children }) => (
+          <td style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{children}</td>
+        ),
+        blockquote: ({ children }) => (
+          <blockquote style={{
+            margin: '6px 0', padding: '4px 10px',
+            borderLeft: '3px solid var(--green)',
+            background: 'rgba(0,220,132,0.04)',
+            color: 'var(--muted)',
+          }}>{children}</blockquote>
+        ),
+      }}
+    >{text}</ReactMarkdown>
+  )
 }
 
 interface Props {
@@ -62,7 +125,9 @@ export default function ChatPanel({ messages, loading, onSend }: Props) {
               borderBottomRightRadius: m.role === 'user' ? 4 : undefined,
               borderBottomLeftRadius: m.role === 'assistant' ? 4 : undefined,
             }}>
-              {m.text}
+              {m.role === 'assistant'
+                ? <MarkdownMessage text={m.text} />
+                : m.text}
             </div>
             <div style={{ fontSize: '0.65rem', color: 'var(--muted)', padding: '0 4px', textAlign: m.role === 'user' ? 'right' : 'left' }}>
               {m.timestamp}

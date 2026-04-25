@@ -357,16 +357,32 @@ def _real_create_payment(args: dict) -> dict:
     acct = _get_primary_account()
     if not acct:
         return {"status": "ERROR", "error": "No accounts found"}
-    payment_id = PaymentApiObject.create(
-        amount=AmountObject(str(args["amount_eur"]), "EUR"),
-        counterparty_alias=PointerObject("IBAN", args["to_iban"]),
-        description=args["description"],
-        monetary_account_id=acct.id_,
-    ).value
+    # bunq requires a name on the IBAN pointer — without it the API rejects
+    # the payment with HTTP 400 "Pointer has no name set."
+    to_name = args.get("to_name") or args.get("to_iban", "")
+    try:
+        payment_id = PaymentApiObject.create(
+            amount=AmountObject(str(args["amount_eur"]), "EUR"),
+            counterparty_alias=PointerObject("IBAN", args["to_iban"], to_name),
+            description=args["description"],
+            monetary_account_id=acct.id_,
+        ).value
+    except Exception as exc:
+        # Surface the raw bunq error so the model and the user see what failed
+        # instead of guessing at a generic "technical issue".
+        return {
+            "status": "ERROR",
+            "error": type(exc).__name__,
+            "message": str(exc),
+            "to_iban": args["to_iban"],
+            "to_name": to_name,
+            "amount_eur": args["amount_eur"],
+        }
     return {
         "status": "SUCCESS",
         "payment_id": str(payment_id),
         "to_iban": args["to_iban"],
+        "to_name": to_name,
         "amount_eur": args["amount_eur"],
         "description": args["description"],
     }

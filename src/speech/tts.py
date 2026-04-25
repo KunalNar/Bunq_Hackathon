@@ -158,7 +158,10 @@ def _speak_kokoro(text: str) -> bytes:
         text,
         voice=_KOKORO_VOICE,
         speed=_KOKORO_SPEED,
-        split_pattern=r"\n+",
+        # Split per sentence so Kokoro pipelines the workload — slightly faster
+        # in total than one giant pass, and leaves the door open for streaming
+        # each chunk to the client (Phase 3) without re-touching this loop.
+        split_pattern=r"(?<=[.!?])\s+",
     ):
         audio = result.audio if hasattr(result, "audio") else result[2]
         if audio is None:

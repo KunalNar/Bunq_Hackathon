@@ -84,6 +84,13 @@ TOOL_DEFINITIONS = [
                     "type": "string",
                     "description": "Recipient IBAN (e.g. NL91ABNA0417164300).",
                 },
+                "to_name": {
+                    "type": "string",
+                    "description": (
+                        "Recipient's full name (required by bunq). Use the name "
+                        "returned by lookup_contact, or the name the user gave you."
+                    ),
+                },
                 "amount_eur": {
                     "type": "number",
                     "description": "Amount in EUR (positive number, e.g. 25.50).",
@@ -94,7 +101,7 @@ TOOL_DEFINITIONS = [
                     "description": "Payment description visible to both parties (max 140 chars).",
                 },
             },
-            "required": ["to_iban", "amount_eur", "description"],
+            "required": ["to_iban", "to_name", "amount_eur", "description"],
         },
     },
     {
