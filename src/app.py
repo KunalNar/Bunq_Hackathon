@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -39,7 +40,44 @@ logger = logging.getLogger("app")
 # Validate config at startup (will raise on missing keys)
 validate()
 
-app = FastAPI(title="bunq Hackathon Assistant", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Pre-load heavy local models so the first user turn doesn't pay a cold start.
+
+    - Kokoro TTS: loads the pipeline + runs a one-shot warm synthesis.
+    - faster-whisper ASR: loads the model + runs a tiny dummy decode.
+    Both are best-effort: if either fails, the server still starts and the
+    relevant endpoint will surface the error per-request.
+    """
+    if os.environ.get("USE_KOKORO_TTS", "false").lower() in ("true", "1", "yes"):
+        try:
+            from src.speech.tts import init_kokoro, speak
+            init_kokoro()
+            speak("ready")  # warm synthesis path on this device
+            logger.info("[startup] Kokoro warmed up")
+        except Exception:
+            logger.exception("[startup] Kokoro init failed; TTS will retry per-request")
+
+    if os.environ.get("USE_LOCAL_WHISPER", "false").lower() in ("true", "1", "yes"):
+        try:
+            import wave, struct
+            from src.speech.asr import transcribe
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+                tmp = f.name
+            with wave.open(tmp, "wb") as w:
+                w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
+                w.writeframes(struct.pack("<" + "h" * 8000, *([0] * 8000)))  # 0.5s silence
+            transcribe(tmp)
+            os.unlink(tmp)
+            logger.info("[startup] Whisper warmed up")
+        except Exception:
+            logger.exception("[startup] Whisper warmup failed; will load on first /voice")
+
+    yield
+
+
+app = FastAPI(title="bunq Hackathon Assistant", version="0.1.0", lifespan=lifespan)
 
 # ── Conversation history (in-memory, one global session for the demo) ──────────
 # In production you'd scope this per user/session.
