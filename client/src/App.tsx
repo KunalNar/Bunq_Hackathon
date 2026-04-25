@@ -116,12 +116,15 @@ export default function App() {
       </header>
 
       {/* Left: Chat */}
-      <div style={{ overflow: 'hidden' }}>
+      <div style={{ minHeight: 0, overflow: 'hidden' }}>
         <ChatPanel messages={messages} loading={loading} onSend={sendMessage} />
       </div>
 
-      {/* Right column */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden' }}>
+      {/* Right column — scrolls as a whole so the stacked panels are always reachable */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 12,
+        minHeight: 0, overflowY: 'auto', paddingRight: 4,
+      }}>
 
         {/* Avatar card */}
         <div style={{ background: 'var(--card)', borderRadius: 'var(--radius)', padding: 20, display: 'flex', justifyContent: 'center' }}>
