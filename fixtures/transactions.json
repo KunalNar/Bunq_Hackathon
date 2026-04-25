@@ -7,11 +7,7 @@
     "currency": "EUR"
   },
   "contacts": [
-    {"name": "Lars",   "full_name": "Lars van den Berg",  "iban": "NL91BUNQ0111222333", "email": "lars@example.com"},
-    {"name": "Anna",   "full_name": "Anna Kowalski",      "iban": "NL91BUNQ0222333444", "email": "anna@example.com"},
-    {"name": "Tom",    "full_name": "Tom Bakker",         "iban": "NL91BUNQ0333444555", "email": "tom@example.com"},
-    {"name": "Sophie", "full_name": "Sophie Müller",      "iban": "NL91BUNQ0444555666", "email": "sophie@example.com"},
-    {"name": "Kunal",  "full_name": "Kunal Narwani",      "iban": "NL91BUNQ0417164300", "email": "kunal@example.com"}
+    {"name": "Sri", "full_name": "Sri", "iban": "NL91BUNQ0222333444", "email": "sri@example.com", "phone": "+31623577405"}
   ],
   "transactions": [
     {

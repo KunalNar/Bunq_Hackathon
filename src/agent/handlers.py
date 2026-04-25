@@ -157,6 +157,23 @@ def _mock_parse_receipt(args: dict) -> dict:
     }
 
 
+def _send_whatsapp_message(args: dict) -> dict:
+    """Build a wa.me deep link. Used for both mock and real modes — wa.me needs no API."""
+    from urllib.parse import quote
+
+    # wa.me wants digits only — strip "+", spaces, dashes
+    digits = "".join(ch for ch in args["to_phone"] if ch.isdigit())
+    url = f"https://wa.me/{digits}?text={quote(args['message'])}"
+    return {
+        "status": "DRAFTED",
+        "to_name": args["to_name"],
+        "to_phone": args["to_phone"],
+        "message": args["message"],
+        "whatsapp_url": url,
+        "note": "Message drafted. User taps the link to send from WhatsApp.",
+    }
+
+
 def _mock_log_action(args: dict) -> dict:
     log_path = Path("audit_log.jsonl")
     entry = {
@@ -564,6 +581,7 @@ _MOCK_HANDLERS: dict[str, Any] = {
     "top_up_savings_goal": _mock_top_up_savings_goal,
     "create_savings_goal": _mock_create_savings_goal,
     "parse_receipt": _mock_parse_receipt,
+    "send_whatsapp_message": _send_whatsapp_message,
     "log_action": _mock_log_action,
 }
 
@@ -578,6 +596,7 @@ _REAL_HANDLERS: dict[str, Any] = {
     "top_up_savings_goal": _real_top_up_savings_goal,
     "create_savings_goal": _real_create_savings_goal,
     "parse_receipt": _real_parse_receipt,
+    "send_whatsapp_message": _send_whatsapp_message,
     "log_action": _real_log_action,
 }
 

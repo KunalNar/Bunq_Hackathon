@@ -238,6 +238,35 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "send_whatsapp_message",
+        "description": (
+            "Drafts a WhatsApp message to a contact and returns a deep link the user can tap "
+            "to send it from their phone. Use this to notify friends after splitting a bill or "
+            "sending a payment request — for example: 'I owe you €28 for dinner, here's the link'. "
+            "ALWAYS call lookup_contact first to get the contact's phone number. "
+            "Confirm the wording with the user before calling. The message is NOT sent automatically — "
+            "the user has to tap the link to send it from WhatsApp."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "to_phone": {
+                    "type": "string",
+                    "description": "Recipient phone number in international format (e.g. +31612345678).",
+                },
+                "to_name": {
+                    "type": "string",
+                    "description": "Recipient's display name (used in the agent's confirmation, not in the message).",
+                },
+                "message": {
+                    "type": "string",
+                    "description": "The full text of the WhatsApp message. Keep it short and friendly.",
+                },
+            },
+            "required": ["to_phone", "to_name", "message"],
+        },
+    },
+    {
         "name": "log_action",
         "description": (
             "Writes an audit log entry describing an action just taken. "

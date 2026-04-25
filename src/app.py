@@ -100,6 +100,29 @@ def _mock_flag(mock: Optional[str]) -> bool:
     return mock.lower() in ("true", "1", "yes")
 
 
+def _extract_whatsapp_links(new_messages: list[dict]) -> list[dict]:
+    """Pull any wa.me deep links the agent drafted this turn out of the tool results."""
+    links: list[dict] = []
+    for msg in new_messages:
+        if msg.get("role") != "user" or not isinstance(msg.get("content"), list):
+            continue
+        for block in msg["content"]:
+            if not (isinstance(block, dict) and block.get("type") == "tool_result"):
+                continue
+            try:
+                payload = json.loads(block.get("content", "{}"))
+            except (json.JSONDecodeError, TypeError):
+                continue
+            url = payload.get("whatsapp_url")
+            if url:
+                links.append({
+                    "url": url,
+                    "to_name": payload.get("to_name"),
+                    "message": payload.get("message"),
+                })
+    return links
+
+
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
@@ -169,10 +192,12 @@ async def chat(req: ChatRequest, mock: Optional[str] = Query(None)):
                 if hasattr(block, "type") and block.type == "tool_use":
                     tool_calls.append({"name": block.name, "args": block.input})
 
-    logger.info(f"[chat] response: {final_text[:100]!r}  tools_used={len(tool_calls)}")
+    whatsapp_links = _extract_whatsapp_links(new_messages)
+    logger.info(f"[chat] response: {final_text[:100]!r}  tools_used={len(tool_calls)}  wa_links={len(whatsapp_links)}")
     return {
         "response": final_text,
         "tool_calls": tool_calls,
+        "whatsapp_links": whatsapp_links,
         "usage": usage,
         "mock_mode": is_mock,
     }
@@ -229,6 +254,7 @@ async def voice(
             "response": final_text,
             "audio_b64": audio_b64,
             "audio_mime": audio_mime_type(),
+            "whatsapp_links": _extract_whatsapp_links(new_messages),
             "mock_mode": is_mock,
             "usage": usage,
         }

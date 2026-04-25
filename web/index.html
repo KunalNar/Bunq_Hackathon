@@ -51,6 +51,11 @@
   .tool-card summary { color: var(--green); font-weight: 600; list-style: none; display: flex; align-items: center; gap: 6px; }
   .tool-card summary::before { content: '⚙'; }
   .tool-card pre { margin-top: 8px; color: var(--muted); font-size: 0.7rem; white-space: pre-wrap; word-break: break-all; }
+  .wa-action { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px;
+    background: #25D366; color: white; font-weight: 600; font-size: 0.8rem; border-radius: 999px;
+    text-decoration: none; max-width: 90%; box-shadow: 0 2px 6px rgba(37,211,102,0.35); transition: transform 0.1s; }
+  .wa-action:hover { transform: translateY(-1px); }
+  .wa-action .wa-icon { font-size: 1rem; }
   .tool-flash { animation: flash 0.6s ease-out; }
   @keyframes flash { 0%{background:rgba(0,220,132,0.3)} 100%{background:rgba(0,220,132,0.05)} }
 
@@ -256,7 +261,11 @@ refreshState();
 setInterval(refreshState, 5000);
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
-function appendMessage(role, text, toolCalls=[]) {
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function appendMessage(role, text, toolCalls=[], whatsappLinks=[]) {
   const msgs = document.getElementById('messages');
   const div = document.createElement('div');
   div.className = `msg ${role}`;
@@ -268,6 +277,17 @@ function appendMessage(role, text, toolCalls=[]) {
     details.className = 'tool-card tool-flash';
     details.innerHTML = `<summary>${tc.name}</summary><pre>${JSON.stringify(tc.args, null, 2)}</pre>`;
     msgs.appendChild(details);
+  });
+  // WhatsApp action buttons — one per drafted message
+  whatsappLinks.forEach(link => {
+    const a = document.createElement('a');
+    a.href = link.url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.className = 'wa-action';
+    a.innerHTML = `<span class="wa-icon">💬</span> Send WhatsApp to ${escapeHtml(link.to_name || 'contact')}`;
+    a.title = link.message || '';
+    msgs.appendChild(a);
   });
   msgs.scrollTop = msgs.scrollHeight;
 }
@@ -299,7 +319,7 @@ async function sendMessage(text) {
     });
     const data = await r.json();
     document.getElementById('typing')?.remove();
-    appendMessage('assistant', data.response || '(no response)', data.tool_calls || []);
+    appendMessage('assistant', data.response || '(no response)', data.tool_calls || [], data.whatsapp_links || []);
     await refreshState();
   } catch(e) {
     document.getElementById('typing')?.remove();
@@ -389,7 +409,7 @@ async function stopRecording() {
       }
       transcriptBox.textContent = data.transcript || '(no transcript)';
       appendMessage('user', data.transcript || '(voice)', []);
-      appendMessage('assistant', data.response || '', []);
+      appendMessage('assistant', data.response || '', [], data.whatsapp_links || []);
       voiceStatus.textContent = 'Done. Hold mic to speak again.';
       // Play TTS audio
       if (data.audio_b64) {
