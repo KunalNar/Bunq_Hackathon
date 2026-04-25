@@ -21,11 +21,13 @@ import json
 import logging
 import os
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, Query, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from src.agent.handlers import execute_tool
@@ -38,13 +40,55 @@ logger = logging.getLogger("app")
 # Validate config at startup (will raise on missing keys)
 validate()
 
-app = FastAPI(title="bunq Hackathon Assistant", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Pre-load heavy local models so the first user turn doesn't pay a cold start.
+
+    - Kokoro TTS: loads the pipeline + runs a one-shot warm synthesis.
+    - faster-whisper ASR: loads the model + runs a tiny dummy decode.
+    Both are best-effort: if either fails, the server still starts and the
+    relevant endpoint will surface the error per-request.
+    """
+    if os.environ.get("USE_KOKORO_TTS", "false").lower() in ("true", "1", "yes"):
+        try:
+            from src.speech.tts import init_kokoro, speak
+            init_kokoro()
+            speak("ready")  # warm synthesis path on this device
+            logger.info("[startup] Kokoro warmed up")
+        except Exception:
+            logger.exception("[startup] Kokoro init failed; TTS will retry per-request")
+
+    if os.environ.get("USE_LOCAL_WHISPER", "false").lower() in ("true", "1", "yes"):
+        try:
+            import wave, struct
+            from src.speech.asr import transcribe
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+                tmp = f.name
+            with wave.open(tmp, "wb") as w:
+                w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
+                w.writeframes(struct.pack("<" + "h" * 8000, *([0] * 8000)))  # 0.5s silence
+            transcribe(tmp)
+            os.unlink(tmp)
+            logger.info("[startup] Whisper warmed up")
+        except Exception:
+            logger.exception("[startup] Whisper warmup failed; will load on first /voice")
+
+    yield
+
+
+app = FastAPI(title="bunq Hackathon Assistant", version="0.1.0", lifespan=lifespan)
 
 # ── Conversation history (in-memory, one global session for the demo) ──────────
 # In production you'd scope this per user/session.
 _conversation: list[dict] = []
 
 WEB_DIR = Path(__file__).parent.parent / "web"
+DIST_DIR = WEB_DIR / "dist"
+
+# Serve React build assets if the dist folder exists
+if DIST_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=str(DIST_DIR / "assets")), name="assets")
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -60,11 +104,24 @@ def _mock_flag(mock: Optional[str]) -> bool:
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_ui():
-    """Serve the single-file demo UI."""
+    """Serve the React build if available, otherwise the legacy single-file UI."""
+    dist_index = DIST_DIR / "index.html"
+    if dist_index.exists():
+        return HTMLResponse(dist_index.read_text())
     index = WEB_DIR / "index.html"
     if not index.exists():
         return HTMLResponse("<h1>UI not found. Run from project root.</h1>", status_code=404)
     return HTMLResponse(index.read_text())
+
+
+@app.get("/avatar.png")
+async def serve_avatar():
+    """Serve the avatar image for the React app."""
+    from fastapi.responses import FileResponse
+    avatar = Path(__file__).parent.parent / "public" / "assets" / "avatar.png"
+    if avatar.exists():
+        return FileResponse(str(avatar))
+    return HTMLResponse("not found", status_code=404)
 
 
 @app.get("/state")
@@ -131,42 +188,62 @@ async def voice(
     and return the response text + base64-encoded TTS audio.
     """
     from src.speech.asr import transcribe
-    from src.speech.tts import speak
+    from src.speech.tts import audio_mime_type, speak
 
     is_mock = _mock_flag(mock)
-
-    # Save upload to temp file for Whisper
-    suffix = Path(audio.filename or "audio.wav").suffix or ".wav"
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        tmp.write(await audio.read())
-        tmp_path = tmp.name
+    tmp_path = None
 
     try:
-        transcript = transcribe(tmp_path)
+        # Save upload to temp file for Whisper
+        suffix = Path(audio.filename or "audio.wav").suffix or ".wav"
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(await audio.read())
+            tmp_path = tmp.name
+
+        transcript = transcribe(tmp_path).strip()
         logger.info(f"[voice] transcript: {transcript!r}")
+        if not transcript:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "No speech detected. Try speaking closer to the mic or for a bit longer.",
+                    "mock_mode": is_mock,
+                },
+            )
+
+        # Run agent with the transcript
+        global _conversation
+        _conversation.append({"role": "user", "content": transcript})
+        final_text, new_messages, usage = run_agent(
+            _conversation,
+            mock_mode=is_mock,
+        )
+        _conversation.extend(new_messages)
+
+        # Convert response to speech
+        audio_bytes = speak(final_text)
+        audio_b64 = base64.b64encode(audio_bytes).decode()
+
+        return {
+            "transcript": transcript,
+            "response": final_text,
+            "audio_b64": audio_b64,
+            "audio_mime": audio_mime_type(),
+            "mock_mode": is_mock,
+            "usage": usage,
+        }
+    except Exception as exc:
+        logger.exception("[voice] processing failed")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": f"Voice processing failed: {exc}",
+                "mock_mode": is_mock,
+            },
+        )
     finally:
-        os.unlink(tmp_path)
-
-    # Run agent with the transcript
-    global _conversation
-    _conversation.append({"role": "user", "content": transcript})
-    final_text, new_messages, usage = run_agent(
-        _conversation,
-        mock_mode=is_mock,
-    )
-    _conversation.extend(new_messages)
-
-    # Convert response to speech
-    audio_bytes = speak(final_text)
-    audio_b64 = base64.b64encode(audio_bytes).decode()
-
-    return {
-        "transcript": transcript,
-        "response": final_text,
-        "audio_b64": audio_b64,
-        "mock_mode": is_mock,
-        "usage": usage,
-    }
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 
 @app.post("/receipt")

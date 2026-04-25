@@ -23,6 +23,11 @@ _USE_LOCAL = os.environ.get("USE_LOCAL_WHISPER", "false").lower() in ("true", "1
 _LOCAL_MODEL_SIZE = os.environ.get("WHISPER_MODEL", "base")  # tiny/base/small/medium
 
 
+def _has_usable_openai_key() -> bool:
+    key = (OPENAI_API_KEY or "").strip()
+    return key.startswith("sk-") and key not in {"sk-", "sk-..", "sk-..."} and len(key) > 20
+
+
 def transcribe(audio_path: str | Path) -> str:
     """
     Transcribe an audio file to text.
@@ -37,7 +42,7 @@ def transcribe(audio_path: str | Path) -> str:
     if not audio_path.exists():
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
-    if _USE_LOCAL:
+    if _USE_LOCAL or not _has_usable_openai_key():
         return _transcribe_local(audio_path)
     return _transcribe_openai(audio_path)
 
@@ -69,8 +74,21 @@ def _transcribe_local(audio_path: Path) -> str:
 
     if not hasattr(_transcribe_local, "_model"):
         print(f"[asr] Loading local Whisper model '{_LOCAL_MODEL_SIZE}' (first run may take a minute)...")
-        _transcribe_local._model = WhisperModel(_LOCAL_MODEL_SIZE, device="cpu")
+        # int8 compute on CPU is ~2x faster than the default float32 path, with
+        # negligible accuracy loss for short conversational utterances.
+        _transcribe_local._model = WhisperModel(
+            _LOCAL_MODEL_SIZE,
+            device="cpu",
+            compute_type="int8",
+        )
 
     model = _transcribe_local._model
-    segments, _info = model.transcribe(str(audio_path), beam_size=5)
+    # beam_size=1 (greedy) is much faster than beam_size=5 and the difference
+    # is imperceptible for short clean audio. vad_filter trims leading/trailing
+    # silence so the decoder isn't transcribing dead air.
+    segments, _info = model.transcribe(
+        str(audio_path),
+        beam_size=1,
+        vad_filter=True,
+    )
     return " ".join(seg.text.strip() for seg in segments)

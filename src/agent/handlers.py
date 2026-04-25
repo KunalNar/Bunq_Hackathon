@@ -60,6 +60,19 @@ def _mock_list_transactions(args: dict) -> dict:
     return {"transactions": transactions[:limit], "total_returned": min(limit, len(transactions))}
 
 
+def _mock_lookup_contact(args: dict) -> dict:
+    data = _load_fixtures()
+    contacts = data.get("contacts", [])
+    query = args["name"].lower()
+    matches = [
+        c for c in contacts
+        if query in c["name"].lower() or query in c["full_name"].lower()
+    ]
+    if not matches:
+        return {"matches": [], "note": f"No contact found for '{args['name']}'."}
+    return {"matches": matches}
+
+
 def _mock_create_payment(args: dict) -> dict:
     return {
         "status": "SUCCESS",
@@ -90,6 +103,25 @@ def _mock_categorize_transaction(args: dict) -> dict:
         "transaction_id": args["transaction_id"],
         "category": args["category"],
         "note": "[MOCK] Category stored in memory only.",
+    }
+
+
+def _mock_list_savings_goals(_args: dict) -> dict:
+    return {
+        "savings_goals": [
+            {"name": "Holiday Fund", "balance_eur": 320.00, "target_eur": 1500.00, "remaining_eur": 1180.00},
+            {"name": "New Laptop",   "balance_eur": 750.00, "target_eur": 1200.00, "remaining_eur": 450.00},
+            {"name": "Emergency",    "balance_eur": 500.00, "target_eur": None,     "remaining_eur": None},
+        ]
+    }
+
+
+def _mock_top_up_savings_goal(args: dict) -> dict:
+    return {
+        "status": "SUCCESS",
+        "jar_name": args["jar_name"],
+        "amount_eur": args["amount_eur"],
+        "note": "[MOCK] No real money was moved.",
     }
 
 
@@ -158,16 +190,132 @@ def _get_bunq_context():
         raise RuntimeError(f"bunq SDK not initialised. Run scripts/seed_sandbox.py first. ({exc})")
 
 
+def _get_primary_account():
+    from bunq.sdk.model.generated.endpoint import MonetaryAccountBankApiObject
+
+    accounts = MonetaryAccountBankApiObject.list().value
+    if not accounts:
+        return None
+    return accounts[0]
+
+
+def _get_bunq_user_display_name():
+    from bunq.sdk.model.generated.endpoint import UserApiObject
+
+    users = UserApiObject.list().value
+    if not users:
+        return None
+
+    user = users[0].get_referenced_object()
+    display_name = getattr(user, "display_name", None)
+    if display_name:
+        return display_name
+
+    public_nick_name = getattr(user, "public_nick_name", None)
+    if public_nick_name:
+        return public_nick_name
+
+    parts = [
+        getattr(user, "first_name", None),
+        getattr(user, "middle_name", None),
+        getattr(user, "last_name", None),
+    ]
+    full_name = " ".join(part for part in parts if part)
+    return full_name or None
+
+
+def _get_counterparty_name(counterparty_alias, description: str | None = None) -> str:
+    if not counterparty_alias:
+        return description or "Unknown counterparty"
+
+    label = getattr(counterparty_alias, "label_monetary_account", None)
+    if label:
+        display_name = getattr(label, "display_name", None)
+        if display_name:
+            return display_name
+
+        label_user = getattr(label, "label_user", None)
+        user_display_name = getattr(label_user, "display_name", None)
+        if user_display_name:
+            return user_display_name
+
+        iban = getattr(label, "iban", None)
+        if iban:
+            return iban
+
+    pointer = getattr(counterparty_alias, "pointer", None)
+    if pointer:
+        pointer_name = getattr(pointer, "name", None)
+        if pointer_name:
+            return pointer_name
+
+        pointer_value = getattr(pointer, "value", None)
+        if pointer_value:
+            return pointer_value
+
+    return description or "Unknown counterparty"
+
+
+def _real_lookup_contact(args: dict) -> dict:
+    """Scan the last 50 payments for counterparties matching the query name."""
+    _get_bunq_context()
+    from bunq.sdk.model.generated.endpoint import PaymentApiObject
+
+    acct = _get_primary_account()
+    if not acct:
+        return {"matches": [], "note": "No accounts found."}
+
+    payments = PaymentApiObject.list(monetary_account_id=acct.id_).value[:50]
+    query = args["name"].lower()
+    seen_ibans: set[str] = set()
+    matches = []
+
+    for p in payments:
+        alias = p.counterparty_alias
+        name = _get_counterparty_name(alias, p.description)
+        if query not in name.lower():
+            continue
+
+        label = getattr(alias, "label_monetary_account", None)
+        iban = getattr(label, "iban", None) if label else None
+        if not iban:
+            pointer = getattr(alias, "pointer", None)
+            if pointer and getattr(pointer, "type_", None) == "IBAN":
+                iban = getattr(pointer, "value", None)
+
+        if not iban or iban in seen_ibans:
+            continue
+        seen_ibans.add(iban)
+
+        label_user = getattr(label, "label_user", None) if label else None
+        email_pointer = None
+        if label_user:
+            for ptr in getattr(label_user, "aliases", None) or []:
+                if getattr(ptr, "type_", None) == "EMAIL":
+                    email_pointer = getattr(ptr, "value", None)
+                    break
+
+        matches.append({
+            "name": name,
+            "full_name": name,
+            "iban": iban,
+            "email": email_pointer,
+        })
+
+    if not matches:
+        return {"matches": [], "note": f"No contact found for '{args['name']}' in payment history."}
+    return {"matches": matches}
+
+
 def _real_get_balance(_args: dict) -> dict:
     _get_bunq_context()
-    from bunq.sdk.model.generated.endpoint import MonetaryAccount
 
-    accounts = MonetaryAccount.list().value
-    if not accounts:
+    acct = _get_primary_account()
+    if not acct:
         return {"error": "No accounts found"}
-    acct = accounts[0].MonetaryAccountBank
+    account_name = _get_bunq_user_display_name() or acct.display_name or acct.description
     return {
-        "account_name": acct.description,
+        "account_name": account_name,
         "iban": next(
             (a.value for a in acct.alias if a.type_ == "IBAN"), "unknown"
         ),
@@ -177,18 +325,20 @@ def _real_get_balance(_args: dict) -> dict:
 
 def _real_list_transactions(args: dict) -> dict:
     _get_bunq_context()
-    from bunq.sdk.model.generated.endpoint import MonetaryAccount, Payment
+    from bunq.sdk.model.generated.endpoint import PaymentApiObject
 
-    accounts = MonetaryAccount.list().value
-    account_id = accounts[0].MonetaryAccountBank.id_
+    acct = _get_primary_account()
+    if not acct:
+        return {"transactions": [], "total_returned": 0}
+    account_id = acct.id_
     limit = min(args.get("limit", 10), 50)
-    payments = Payment.list(monetary_account_id=account_id).value[:limit]
+    payments = PaymentApiObject.list(monetary_account_id=account_id).value[:limit]
     txns = []
     for p in payments:
         txns.append({
             "id": str(p.id_),
             "date": str(p.created)[:10],
-            "merchant": p.counterparty_alias.display_name,
+            "merchant": _get_counterparty_name(p.counterparty_alias, p.description),
             "amount_eur": float(p.amount.value),
             "description": p.description,
             "category": "other",
@@ -201,21 +351,38 @@ def _real_list_transactions(args: dict) -> dict:
 
 def _real_create_payment(args: dict) -> dict:
     _get_bunq_context()
-    from bunq.sdk.model.generated.endpoint import MonetaryAccount, Payment
-    from bunq.sdk.model.generated.object_ import Amount, Pointer
+    from bunq.sdk.model.generated.endpoint import PaymentApiObject
+    from bunq.sdk.model.generated.object_ import AmountObject, PointerObject
 
-    accounts = MonetaryAccount.list().value
-    account_id = accounts[0].MonetaryAccountBank.id_
-    payment_id = Payment.create(
-        amount=Amount(str(args["amount_eur"]), "EUR"),
-        counterparty_alias=Pointer("IBAN", args["to_iban"]),
-        description=args["description"],
-        monetary_account_id=account_id,
-    ).value
+    acct = _get_primary_account()
+    if not acct:
+        return {"status": "ERROR", "error": "No accounts found"}
+    # bunq requires a name on the IBAN pointer — without it the API rejects
+    # the payment with HTTP 400 "Pointer has no name set."
+    to_name = args.get("to_name") or args.get("to_iban", "")
+    try:
+        payment_id = PaymentApiObject.create(
+            amount=AmountObject(str(args["amount_eur"]), "EUR"),
+            counterparty_alias=PointerObject("IBAN", args["to_iban"], to_name),
+            description=args["description"],
+            monetary_account_id=acct.id_,
+        ).value
+    except Exception as exc:
+        # Surface the raw bunq error so the model and the user see what failed
+        # instead of guessing at a generic "technical issue".
+        return {
+            "status": "ERROR",
+            "error": type(exc).__name__,
+            "message": str(exc),
+            "to_iban": args["to_iban"],
+            "to_name": to_name,
+            "amount_eur": args["amount_eur"],
+        }
     return {
         "status": "SUCCESS",
         "payment_id": str(payment_id),
         "to_iban": args["to_iban"],
+        "to_name": to_name,
         "amount_eur": args["amount_eur"],
         "description": args["description"],
     }
@@ -223,17 +390,18 @@ def _real_create_payment(args: dict) -> dict:
 
 def _real_create_request_inquiry(args: dict) -> dict:
     _get_bunq_context()
-    from bunq.sdk.model.generated.endpoint import MonetaryAccount, RequestInquiry
-    from bunq.sdk.model.generated.object_ import Amount, Pointer
+    from bunq.sdk.model.generated.endpoint import RequestInquiryApiObject
+    from bunq.sdk.model.generated.object_ import AmountObject, PointerObject
 
-    accounts = MonetaryAccount.list().value
-    account_id = accounts[0].MonetaryAccountBank.id_
-    req_id = RequestInquiry.create(
-        amount_inquired=Amount(str(args["amount_eur"]), "EUR"),
-        counterparty_alias=Pointer("EMAIL", args["to_email"]),
+    acct = _get_primary_account()
+    if not acct:
+        return {"status": "ERROR", "error": "No accounts found"}
+    req_id = RequestInquiryApiObject.create(
+        amount_inquired=AmountObject(str(args["amount_eur"]), "EUR"),
+        counterparty_alias=PointerObject("EMAIL", args["to_email"]),
         description=args["description"],
         allow_bunqme=True,
-        monetary_account_id=account_id,
+        monetary_account_id=acct.id_,
     ).value
     return {
         "status": "SENT",
@@ -248,16 +416,87 @@ def _real_categorize_transaction(args: dict) -> dict:
     return _mock_categorize_transaction(args)
 
 
+def _real_list_savings_goals(_args: dict) -> dict:
+    _get_bunq_context()
+    from bunq.sdk.model.generated.endpoint import MonetaryAccountSavingsApiObject
+
+    accounts = MonetaryAccountSavingsApiObject.list().value
+    goals = []
+    for acct in accounts:
+        if getattr(acct, "status", None) != "ACTIVE":
+            continue
+        balance = float(acct.balance.value) if acct.balance else 0.0
+        target = None
+        if acct.savings_goal:
+            target = float(acct.savings_goal.value)
+        goals.append({
+            "name": acct.description,
+            "balance_eur": balance,
+            "target_eur": target,
+            "remaining_eur": round(target - balance, 2) if target is not None else None,
+        })
+    return {"savings_goals": goals}
+
+
+def _real_top_up_savings_goal(args: dict) -> dict:
+    _get_bunq_context()
+    from bunq.sdk.model.generated.endpoint import (
+        MonetaryAccountBankApiObject,
+        MonetaryAccountSavingsApiObject,
+        PaymentApiObject,
+    )
+    from bunq.sdk.model.generated.object_ import AmountObject, PointerObject
+
+    query = args["jar_name"].lower()
+    savings_accounts = MonetaryAccountSavingsApiObject.list().value
+    jar = next(
+        (a for a in savings_accounts
+         if query in (a.description or "").lower() and getattr(a, "status", None) == "ACTIVE"),
+        None,
+    )
+    if not jar:
+        return {"status": "ERROR", "error": f"No active savings jar found matching '{args['jar_name']}'."}
+
+    jar_iban = next((a.value for a in (jar.alias or []) if a.type_ == "IBAN"), None)
+    if not jar_iban:
+        return {"status": "ERROR", "error": "Could not find IBAN for that savings jar."}
+
+    main_accounts = MonetaryAccountBankApiObject.list().value
+    if not main_accounts:
+        return {"status": "ERROR", "error": "No main account found."}
+    main_acct = main_accounts[0]
+
+    amount_str = f"{float(args['amount_eur']):.2f}"
+    try:
+        payment_id = PaymentApiObject.create(
+            amount=AmountObject(amount_str, "EUR"),
+            counterparty_alias=PointerObject("IBAN", jar_iban, jar.description),
+            description=f"Top up {jar.description}",
+            monetary_account_id=main_acct.id_,
+        ).value
+    except Exception as exc:
+        logger.error("bunq top_up_savings_goal failed: %s", exc)
+        return {"status": "ERROR", "error": str(exc), "jar_iban": jar_iban}
+
+    return {
+        "status": "SUCCESS",
+        "payment_id": str(payment_id),
+        "jar_name": jar.description,
+        "amount_eur": args["amount_eur"],
+        "jar_iban": jar_iban,
+    }
+
+
 def _real_create_savings_goal(args: dict) -> dict:
     _get_bunq_context()
-    from bunq.sdk.model.generated.endpoint import MonetaryAccountSavings
-    from bunq.sdk.model.generated.object_ import Amount
+    from bunq.sdk.model.generated.endpoint import MonetaryAccountSavingsApiObject
+    from bunq.sdk.model.generated.object_ import AmountObject
 
     target = args.get("target_eur")
-    savings_id = MonetaryAccountSavings.create(
+    savings_id = MonetaryAccountSavingsApiObject.create(
         currency="EUR",
         description=args["name"],
-        savings_goal=Amount(str(target), "EUR") if target else None,
+        savings_goal=AmountObject(str(target), "EUR") if target else None,
     ).value
     return {
         "status": "CREATED",
@@ -317,9 +556,12 @@ def _real_log_action(args: dict) -> dict:
 _MOCK_HANDLERS: dict[str, Any] = {
     "get_balance": _mock_get_balance,
     "list_transactions": _mock_list_transactions,
+    "lookup_contact": _mock_lookup_contact,
     "create_payment": _mock_create_payment,
     "create_request_inquiry": _mock_create_request_inquiry,
     "categorize_transaction": _mock_categorize_transaction,
+    "list_savings_goals": _mock_list_savings_goals,
+    "top_up_savings_goal": _mock_top_up_savings_goal,
     "create_savings_goal": _mock_create_savings_goal,
     "parse_receipt": _mock_parse_receipt,
     "log_action": _mock_log_action,
@@ -328,9 +570,12 @@ _MOCK_HANDLERS: dict[str, Any] = {
 _REAL_HANDLERS: dict[str, Any] = {
     "get_balance": _real_get_balance,
     "list_transactions": _real_list_transactions,
+    "lookup_contact": _real_lookup_contact,
     "create_payment": _real_create_payment,
     "create_request_inquiry": _real_create_request_inquiry,
     "categorize_transaction": _real_categorize_transaction,
+    "list_savings_goals": _real_list_savings_goals,
+    "top_up_savings_goal": _real_top_up_savings_goal,
     "create_savings_goal": _real_create_savings_goal,
     "parse_receipt": _real_parse_receipt,
     "log_action": _real_log_action,

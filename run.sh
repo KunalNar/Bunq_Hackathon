@@ -51,7 +51,20 @@ source "$VENV_DIR/bin/activate"
 
 # ── Install deps ───────────────────────────────────────────────────────────────
 echo "Installing dependencies…"
-pip install -e . -q
+INSTALL_EXTRAS=()
+if grep -qi '^USE_LOCAL_WHISPER=true' .env 2>/dev/null; then
+  INSTALL_EXTRAS+=("offline")
+fi
+if grep -qi '^USE_KOKORO_TTS=true' .env 2>/dev/null; then
+  INSTALL_EXTRAS+=("kokoro")
+fi
+
+if [ ${#INSTALL_EXTRAS[@]} -gt 0 ]; then
+  EXTRAS_CSV=$(IFS=,; echo "${INSTALL_EXTRAS[*]}")
+  pip install -e ".[${EXTRAS_CSV}]" -q
+else
+  pip install -e . -q
+fi
 
 # ── Seed ──────────────────────────────────────────────────────────────────────
 if [ "$SEED" = true ]; then
@@ -77,6 +90,12 @@ else
   export MOCK_MODE=true
   echo ""
   echo "🟡 MOCK MODE — using fixture data (safe for demo)"
+fi
+
+# ── Build React UI ────────────────────────────────────────────────────────────
+if [ -d "client" ] && command -v npm &>/dev/null; then
+  echo "Building React UI…"
+  (cd client && npm install -q && npm run build 2>&1 | tail -3)
 fi
 
 # ── Start server ──────────────────────────────────────────────────────────────
