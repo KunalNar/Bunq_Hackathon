@@ -1,0 +1,1304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>GuardianAI — Interactive Demo</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --bg-soft: #11141b;
+    --panel: #161a23;
+    --panel-2: #1d2230;
+    --line: #262c3b;
+    --text: #eef1f7;
+    --muted: #9aa3b6;
+    --accent: #5b8cff;
+    --accent-2: #8b7cff;
+    --good: #2ecc71;
+    --warn: #ffb020;
+    --bad: #ff5d6c;
+    --bunq: #38b6ff;
+    --shadow: 0 30px 80px rgba(0,0,0,0.5);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background:
+      radial-gradient(1200px 700px at 20% -10%, rgba(91,140,255,0.18), transparent 60%),
+      radial-gradient(900px 600px at 90% 110%, rgba(139,124,255,0.14), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .stage {
+    display: grid;
+    grid-template-columns: 1fr minmax(340px, 420px) 1fr;
+    gap: 28px;
+    align-items: start;
+    padding: 28px 32px 64px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  @media (max-width: 980px) {
+    .stage { grid-template-columns: 1fr; padding: 16px; }
+    .side-left, .side-right { order: 2; }
+    .phone-col { order: 1; }
+  }
+
+  /* Header */
+  .header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 4px 18px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+  .brand-mark {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center;
+    box-shadow: 0 8px 24px rgba(91,140,255,0.35);
+  }
+  .brand-mark svg { width: 22px; height: 22px; }
+  .brand-text { font-size: 18px; }
+  .brand-sub { color: var(--muted); font-weight: 500; font-size: 13px; margin-left: 6px;}
+  .pill {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  /* Side panels */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+  }
+  .panel h3 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .scene-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+  .scene-list li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 14px;
+    border: 1px solid transparent;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+  }
+  .scene-list li .num {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 11px; font-weight: 700;
+    background: var(--panel-2); color: var(--muted);
+    border: 1px solid var(--line);
+    flex: 0 0 auto;
+  }
+  .scene-list li:hover { background: var(--panel-2); color: var(--text); }
+  .scene-list li.active { background: rgba(91,140,255,0.12); color: var(--text); border-color: rgba(91,140,255,0.4); }
+  .scene-list li.active .num { background: var(--accent); color: white; border-color: transparent; }
+  .scene-list li.done .num { background: var(--good); color: white; border-color: transparent; }
+  .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;}
+  .feature-tag {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 12px;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .feature-tag .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .legend-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); padding: 6px 0; }
+  .legend-row b { color: var(--text); font-weight: 600; }
+  .key-stat {
+    background: linear-gradient(135deg, rgba(91,140,255,0.14), rgba(139,124,255,0.10));
+    border: 1px solid rgba(91,140,255,0.35);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .key-stat .num { font-size: 26px; font-weight: 700; }
+  .key-stat .lbl { color: var(--muted); font-size: 12px; margin-top: 2px;}
+
+  /* Phone mockup */
+  .phone-col { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+  .phone {
+    width: 360px;
+    height: 740px;
+    background: #0c0f15;
+    border-radius: 48px;
+    border: 1px solid #2a2f3d;
+    box-shadow:
+      0 0 0 8px #181c25,
+      0 0 0 9px #2a2f3d,
+      0 50px 100px rgba(0,0,0,0.7),
+      inset 0 0 0 1px rgba(255,255,255,0.04);
+    position: relative;
+    overflow: hidden;
+  }
+  .notch {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 28px; border-radius: 16px; background: #000;
+    z-index: 5;
+  }
+  .status-bar {
+    position: absolute; top: 0; left: 0; right: 0; height: 50px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 28px 0; font-size: 12px; color: var(--text);
+    z-index: 4;
+  }
+  .status-bar .icons { display:flex; gap:6px; }
+  .screen {
+    position: absolute; inset: 0;
+    padding: 56px 18px 18px;
+    display: flex; flex-direction: column;
+    background:
+      radial-gradient(600px 400px at 50% -10%, rgba(91,140,255,0.14), transparent 60%),
+      linear-gradient(180deg, #0e1118 0%, #0a0c12 100%);
+  }
+
+  /* Avatar */
+  .avatar-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    margin-top: 4px;
+  }
+  .avatar-bg {
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 30% 30%, rgba(91,140,255,0.45), transparent 60%),
+      radial-gradient(circle at 70% 70%, rgba(139,124,255,0.35), transparent 60%),
+      #161a23;
+    border: 1px solid var(--line);
+    display: grid; place-items: center;
+    position: relative;
+    transition: transform 0.4s ease, box-shadow 0.4s ease;
+  }
+  .avatar-bg.speaking {
+    box-shadow: 0 0 0 4px rgba(91,140,255,0.18), 0 0 60px rgba(91,140,255,0.35);
+  }
+  .avatar-bg.listening {
+    box-shadow: 0 0 0 4px rgba(46,204,113,0.18), 0 0 60px rgba(46,204,113,0.35);
+  }
+  .avatar-bg.alert {
+    box-shadow: 0 0 0 4px rgba(255,93,108,0.22), 0 0 60px rgba(255,93,108,0.35);
+  }
+  .avatar-bg svg { width: 160px; height: 160px; }
+  .avatar-name {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .avatar-name b { color: var(--text); font-weight: 700; }
+
+  /* Subtitle / dialogue */
+  .dialog {
+    margin-top: 14px;
+    background: linear-gradient(135deg, rgba(91,140,255,0.10), rgba(139,124,255,0.08));
+    border: 1px solid rgba(91,140,255,0.30);
+    border-radius: 14px;
+    padding: 12px 14px;
+    font-size: 14.5px;
+    line-height: 1.45;
+    min-height: 56px;
+    color: var(--text);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  .dialog.user {
+    background: linear-gradient(135deg, rgba(46,204,113,0.10), rgba(46,204,113,0.04));
+    border-color: rgba(46,204,113,0.32);
+  }
+  .dialog .who {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .dialog.user .who { color: #6fd49a; }
+  .dialog .who.guardian { color: #8fb0ff; }
+
+  /* Card area inside screen */
+  .card-area {
+    margin-top: 14px;
+    flex: 1;
+    display: flex; flex-direction: column;
+    gap: 10px;
+    overflow: hidden;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px;
+    animation: pop 0.35s ease both;
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .card .label { color: var(--muted); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;}
+  .row { display: flex; align-items: center; justify-content: space-between; }
+  .amount { font-size: 28px; font-weight: 700; }
+  .amount.small { font-size: 20px; }
+  .recipient { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .avatar-mini { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: white; }
+  .avatar-mini.lars { background: linear-gradient(135deg, #ff8a65, #ff5252); }
+  .avatar-mini.anna { background: linear-gradient(135deg, #ba68c8, #7e57c2); }
+  .avatar-mini.tom { background: linear-gradient(135deg, #4fc3f7, #29b6f6); }
+  .avatar-mini.you { background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+  .recipient .meta { display: flex; flex-direction: column; }
+  .recipient .name { font-weight: 600; font-size: 14px; }
+  .recipient .sub { color: var(--muted); font-size: 12px; }
+  .note {
+    background: var(--panel-2);
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  /* Voice waveform */
+  .wave {
+    display: flex; align-items: center; justify-content: center;
+    gap: 3px; height: 40px; margin-top: 10px;
+  }
+  .wave .bar {
+    width: 4px; background: var(--good); border-radius: 2px;
+    height: 6px;
+    animation: wave 0.9s ease-in-out infinite;
+  }
+  .wave .bar:nth-child(1){ animation-delay: 0.0s;}
+  .wave .bar:nth-child(2){ animation-delay: 0.08s;}
+  .wave .bar:nth-child(3){ animation-delay: 0.16s;}
+  .wave .bar:nth-child(4){ animation-delay: 0.24s;}
+  .wave .bar:nth-child(5){ animation-delay: 0.32s;}
+  .wave .bar:nth-child(6){ animation-delay: 0.40s;}
+  .wave .bar:nth-child(7){ animation-delay: 0.48s;}
+  .wave .bar:nth-child(8){ animation-delay: 0.56s;}
+  .wave .bar:nth-child(9){ animation-delay: 0.40s;}
+  .wave .bar:nth-child(10){ animation-delay: 0.32s;}
+  .wave .bar:nth-child(11){ animation-delay: 0.24s;}
+  .wave .bar:nth-child(12){ animation-delay: 0.16s;}
+  .wave .bar:nth-child(13){ animation-delay: 0.08s;}
+  @keyframes wave {
+    0%, 100% { height: 6px; opacity: 0.5; }
+    50% { height: 28px; opacity: 1; }
+  }
+
+  /* Confirm buttons */
+  .confirm-btns { display: flex; gap: 8px; margin-top: 12px; }
+  .btn {
+    flex: 1; padding: 11px 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; color: white; }
+  .btn.danger { background: linear-gradient(135deg, var(--bad), #c0392b); border-color: transparent; color: white; }
+  .btn.ghost { background: transparent; }
+
+  /* Success */
+  .success {
+    display: flex; align-items: center; gap: 12px;
+    background: linear-gradient(135deg, rgba(46,204,113,0.16), rgba(46,204,113,0.05));
+    border: 1px solid rgba(46,204,113,0.36);
+    border-radius: 14px; padding: 14px;
+    animation: pop 0.4s ease both;
+  }
+  .success .check {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--good); display: grid; place-items: center;
+    color: white; font-weight: 700;
+  }
+
+  /* Bill / receipt */
+  .receipt {
+    background: #f3eee2;
+    color: #2b2418;
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-family: "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .receipt .h { text-align: center; font-weight: 700; margin-bottom: 6px; letter-spacing: 0.15em;}
+  .receipt .l { display: flex; justify-content: space-between; }
+  .receipt hr { border: none; border-top: 1px dashed #b8a886; margin: 6px 0; }
+  .receipt .total { font-weight: 700; font-size: 14px; }
+
+  /* Split UI */
+  .split-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .split-cell {
+    background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px; text-align: center;
+  }
+  .split-cell .a { width: 36px; height: 36px; border-radius: 50%; margin: 0 auto 6px; display: grid; place-items: center; font-weight: 700; color: white;}
+  .split-cell .n { font-size: 12px; color: var(--muted); }
+  .split-cell .v { font-size: 16px; font-weight: 700; margin-top: 2px; }
+
+  /* Chart */
+  .chart {
+    display: flex; align-items: flex-end; gap: 8px;
+    height: 130px; padding: 8px 4px 0;
+  }
+  .chart .col {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .chart .bar2 {
+    width: 100%; border-radius: 6px 6px 0 0;
+    background: linear-gradient(180deg, var(--accent), var(--accent-2));
+    height: 0%;
+    transition: height 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .chart .col.dim .bar2 { background: linear-gradient(180deg, #2c3346, #20253433); opacity: 0.6;}
+  .chart .col.hot .bar2 { background: linear-gradient(180deg, var(--warn), #ff7043); }
+  .chart .lbl { font-size: 10px; color: var(--muted); }
+  .chart .val { font-size: 10px; color: var(--text); font-weight: 700; }
+
+  /* Notification (SMS) */
+  .sms {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 14px;
+    padding: 12px 14px;
+    backdrop-filter: blur(12px);
+    animation: shake 0.5s ease both;
+  }
+  @keyframes shake {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(-3px); }
+    50% { transform: translateX(3px); }
+    75% { transform: translateX(-2px); }
+    100% { transform: translateX(0); }
+  }
+  .sms .from { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .sms .from b { color: var(--text); font-weight: 700;}
+  .sms .msg { font-size: 13px; line-height: 1.4; }
+  .sms .url { color: #6fa8ff; word-break: break-all; }
+
+  /* Fraud analysis */
+  .fraud-card {
+    background: linear-gradient(135deg, rgba(255,93,108,0.16), rgba(255,93,108,0.05));
+    border: 1px solid rgba(255,93,108,0.40);
+    border-radius: 14px; padding: 14px;
+  }
+  .fraud-card .head {
+    display: flex; align-items: center; gap: 10px;
+    color: var(--bad); font-weight: 700; font-size: 14px;
+  }
+  .fraud-card .findings { margin: 10px 0 4px; padding: 0; list-style: none; }
+  .fraud-card .findings li { padding: 6px 0; font-size: 12.5px; color: var(--text); display: flex; gap: 8px;}
+  .fraud-card .findings li::before { content: "✕"; color: var(--bad); font-weight: 700; }
+
+  /* Card freeze */
+  .freeze {
+    background: linear-gradient(135deg, #1e2540, #0d1226);
+    border: 1px solid rgba(91,140,255,0.45);
+    border-radius: 14px; padding: 14px;
+    color: #cfd8ff;
+    position: relative; overflow: hidden;
+  }
+  .freeze::before {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+    transform: translateX(-100%);
+    animation: shimmer 2s infinite;
+  }
+  @keyframes shimmer { to { transform: translateX(100%); } }
+  .freeze .lbl-row { display: flex; justify-content: space-between; align-items: center; }
+  .freeze .num { letter-spacing: 0.25em; font-family: "SF Mono", monospace; margin-top: 14px; font-size: 14px;}
+  .freeze .name-row { display: flex; justify-content: space-between; margin-top: 10px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em;}
+  .freeze .frozen-tag {
+    position: absolute; top: 12px; right: 12px;
+    background: rgba(91,140,255,0.20);
+    border: 1px solid rgba(91,140,255,0.6);
+    color: #aac4ff;
+    padding: 4px 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+  }
+
+  /* API call indicator */
+  .api-call {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px;
+    margin-top: 8px;
+    font-family: "SF Mono", monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .api-call .method { color: var(--good); font-weight: 700; }
+  .api-call .ep { color: var(--accent); }
+  .api-call .ok { color: var(--good); }
+
+  /* Controls */
+  .controls {
+    width: 100%;
+    max-width: 360px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 14px;
+    box-shadow: var(--shadow);
+  }
+  .scrub {
+    height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden;
+    margin-bottom: 12px; cursor: pointer; position: relative;
+  }
+  .scrub .fill { height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    border-radius: 3px; transition: width 0.2s ease; }
+  .ctrl-row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+  .ctrl-btn {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: var(--panel-2); border: 1px solid var(--line);
+    color: var(--text); cursor: pointer;
+    display: grid; place-items: center;
+  }
+  .ctrl-btn.play { width: 56px; height: 44px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-color: transparent; color: white;
+  }
+  .ctrl-btn:hover { background: var(--line); }
+  .ctrl-btn.play:hover { filter: brightness(1.05); }
+  .ctrl-btn svg { width: 16px; height: 16px; fill: currentColor; }
+  .ctrl-meta {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; color: var(--muted); margin-top: 10px;
+  }
+  .ctrl-meta .now { color: var(--text); font-weight: 600; }
+
+  .toggle-voice {
+    margin-top: 8px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px 12px; font-size: 12px; color: var(--muted);
+  }
+  .toggle-voice .switch {
+    width: 36px; height: 20px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background 0.2s;
+  }
+  .toggle-voice .switch::after {
+    content:""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px;
+    border-radius: 50%; background: white; transition: left 0.2s;
+  }
+  .toggle-voice.on .switch { background: var(--good); }
+  .toggle-voice.on .switch::after { left: 18px; }
+
+  /* Avatar SVG anim helpers */
+  .blink { animation: blink 4s infinite; transform-origin: center; }
+  @keyframes blink {
+    0%, 92%, 100% { transform: scaleY(1); }
+    94% { transform: scaleY(0.1); }
+    96% { transform: scaleY(1); }
+  }
+  .mouth-rest { display: inline; }
+  .mouth-talk1, .mouth-talk2 { display: none; }
+  .speaking .mouth-rest { display: none; }
+  .speaking .mouth-talk1 { display: inline; animation: m1 0.32s steps(1) infinite alternate; }
+  .speaking .mouth-talk2 { display: none; animation: m2 0.32s steps(1) infinite alternate; }
+  @keyframes m1 { 0%{opacity:1;} 50%{opacity:0;} 100%{opacity:1;} }
+  @keyframes m2 { 0%{opacity:0;} 50%{opacity:1;} 100%{opacity:0;} }
+  .speaking .mouth-talk2 { display: inline; }
+
+  /* Fade-in helper */
+  .fade { animation: fade 0.4s ease both; }
+  @keyframes fade {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Footer credit */
+  .footer {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    padding-top: 10px;
+  }
+  .footer span { color: var(--accent); }
+
+  /* small phone mockup helpers */
+  .phone-shadow {
+    width: 220px; height: 12px; border-radius: 50%;
+    background: rgba(0,0,0,0.6); filter: blur(12px);
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+  <header class="header">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M9 12l2 2 4-4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-text">GuardianAI <span class="brand-sub">— the bank you talk to</span></div>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <span class="pill">Hackathon Demo</span>
+      <span class="pill">Voice + Vision + Tools</span>
+    </div>
+  </header>
+
+  <!-- LEFT PANEL: Scenes -->
+  <aside class="side-left">
+    <div class="panel">
+      <h3>Demo timeline</h3>
+      <ol class="scene-list" id="sceneList"></ol>
+    </div>
+    <div class="panel" style="margin-top:16px;">
+      <h3>Tech in this demo</h3>
+      <div class="feature-grid">
+        <div class="feature-tag"><span class="dot"></span> Claude Opus 4.6</div>
+        <div class="feature-tag"><span class="dot"></span> Agent SDK</div>
+        <div class="feature-tag"><span class="dot"></span> faster-whisper</div>
+        <div class="feature-tag"><span class="dot"></span> ElevenLabs TTS</div>
+        <div class="feature-tag"><span class="dot"></span> Claude Vision</div>
+        <div class="feature-tag"><span class="dot"></span> bunq Sandbox</div>
+        <div class="feature-tag"><span class="dot"></span> S3 media</div>
+        <div class="feature-tag"><span class="dot"></span> React + Vite</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CENTER: Phone + Controls -->
+  <section class="phone-col">
+    <div class="phone" aria-label="GuardianAI app">
+      <div class="notch"></div>
+      <div class="status-bar">
+        <span id="clock">9:41</span>
+        <div class="icons">
+          <span>5G</span><span>•••</span><span>96%</span>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="avatar-wrap">
+          <div class="avatar-bg" id="avatarBg">
+            <svg id="avatarSvg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <!-- background ring -->
+              <defs>
+                <linearGradient id="hairGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#3a2f6e"/>
+                  <stop offset="100%" stop-color="#5b8cff"/>
+                </linearGradient>
+                <linearGradient id="skinGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#f6d4b1"/>
+                  <stop offset="100%" stop-color="#e8b88c"/>
+                </linearGradient>
+                <radialGradient id="cheek" cx="0.5" cy="0.5" r="0.5">
+                  <stop offset="0%" stop-color="#ff9d8a" stop-opacity="0.6"/>
+                  <stop offset="100%" stop-color="#ff9d8a" stop-opacity="0"/>
+                </radialGradient>
+              </defs>
+              <!-- hair back -->
+              <path d="M40,108 C40,60 70,30 100,30 C130,30 160,60 160,108 L160,140 L140,140 L140,120 C140,120 130,108 100,108 C70,108 60,120 60,120 L60,140 L40,140 Z" fill="url(#hairGrad)"/>
+              <!-- face -->
+              <ellipse cx="100" cy="110" rx="50" ry="56" fill="url(#skinGrad)"/>
+              <!-- ears -->
+              <ellipse cx="50" cy="115" rx="7" ry="11" fill="url(#skinGrad)"/>
+              <ellipse cx="150" cy="115" rx="7" ry="11" fill="url(#skinGrad)"/>
+              <!-- cheeks -->
+              <ellipse cx="74" cy="128" rx="12" ry="8" fill="url(#cheek)"/>
+              <ellipse cx="126" cy="128" rx="12" ry="8" fill="url(#cheek)"/>
+              <!-- brows -->
+              <path d="M70,92 Q80,86 90,92" stroke="#3a2f6e" stroke-width="3" stroke-linecap="round" fill="none"/>
+              <path d="M110,92 Q120,86 130,92" stroke="#3a2f6e" stroke-width="3" stroke-linecap="round" fill="none"/>
+              <!-- eyes -->
+              <g class="blink">
+                <ellipse cx="80" cy="108" rx="6" ry="7" fill="white"/>
+                <circle cx="80" cy="109" r="3.5" fill="#2b2240"/>
+                <circle cx="81" cy="108" r="1" fill="white"/>
+              </g>
+              <g class="blink" style="animation-delay: 0.05s;">
+                <ellipse cx="120" cy="108" rx="6" ry="7" fill="white"/>
+                <circle cx="120" cy="109" r="3.5" fill="#2b2240"/>
+                <circle cx="121" cy="108" r="1" fill="white"/>
+              </g>
+              <!-- nose -->
+              <path d="M100,118 Q98,128 100,134 Q102,135 104,133" stroke="#c8956a" stroke-width="2" fill="none" stroke-linecap="round"/>
+              <!-- mouth (rest) -->
+              <g id="mouthGroup">
+                <path class="mouth-rest" d="M88,148 Q100,156 112,148" stroke="#7a3a2f" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <ellipse class="mouth-talk1" cx="100" cy="150" rx="9" ry="5" fill="#7a3a2f"/>
+                <ellipse class="mouth-talk2" cx="100" cy="150" rx="6" ry="3" fill="#7a3a2f"/>
+              </g>
+              <!-- hair front -->
+              <path d="M52,90 C70,50 130,50 148,90 C140,80 124,76 110,82 C108,72 92,72 90,82 C76,76 60,80 52,90 Z" fill="url(#hairGrad)"/>
+            </svg>
+          </div>
+          <div class="avatar-name">Guardian<b>AI</b></div>
+        </div>
+
+        <div class="dialog" id="dialog">
+          <div class="who guardian">Guardian</div>
+          <div class="text" id="dialogText">Tap play to start the demo.</div>
+        </div>
+
+        <div class="card-area" id="cardArea"></div>
+      </div>
+    </div>
+    <div class="phone-shadow"></div>
+
+    <div class="controls">
+      <div class="scrub" id="scrub" title="Click to scrub"><div class="fill" id="scrubFill"></div></div>
+      <div class="ctrl-row">
+        <button class="ctrl-btn" id="prevBtn" title="Previous scene">
+          <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zM9.5 12l8.5-6v12z"/></svg>
+        </button>
+        <button class="ctrl-btn" id="restartBtn" title="Restart">
+          <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.41 3.59 8 8 8s8-3.59 8-8-3.59-8-8-8z"/></svg>
+        </button>
+        <button class="ctrl-btn play" id="playBtn" title="Play / pause">
+          <svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <button class="ctrl-btn" id="muteBtn" title="Mute voice">
+          <svg viewBox="0 0 24 24" id="muteIcon"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.06A4.5 4.5 0 0 0 16.5 12z"/></svg>
+        </button>
+        <button class="ctrl-btn" id="nextBtn" title="Next scene">
+          <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 6v12l8.5-6z"/></svg>
+        </button>
+      </div>
+      <div class="ctrl-meta">
+        <span id="sceneTitle" class="now">Scene 1 — Intro</span>
+        <span id="sceneCounter">1 / 13</span>
+      </div>
+      <div class="toggle-voice" id="voiceToggle">
+        <span>Speak the avatar's lines (browser TTS)</span>
+        <div class="switch"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT: Live "agent state" -->
+  <aside class="side-right">
+    <div class="panel">
+      <h3>Agent state</h3>
+      <div id="stateBox">
+        <div class="key-stat">
+          <div class="num" id="stateAction">Idle</div>
+          <div class="lbl" id="stateDetail">Ready to start the demo.</div>
+        </div>
+        <div class="legend-row"><b>STT:</b> <span id="sttState">—</span></div>
+        <div class="legend-row"><b>LLM:</b> <span id="llmState">—</span></div>
+        <div class="legend-row"><b>Tool:</b> <span id="toolState">—</span></div>
+        <div class="legend-row"><b>TTS:</b> <span id="ttsState">—</span></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px;">
+      <h3>Mock bunq account</h3>
+      <div class="legend-row"><b>Holder:</b> Kunal Narwani</div>
+      <div class="legend-row"><b>IBAN:</b> NL00 BUNQ 1234 5678 90</div>
+      <div class="legend-row"><b>Balance:</b> <span id="balance">€3,214.50</span></div>
+      <div class="legend-row"><b>Contacts:</b> Lars · Anna · Tom · Sophie</div>
+      <div class="api-call" id="apiCalls" style="margin-top:10px; min-height: 60px;">
+        <div style="color:var(--muted); font-style: italic;">// API calls appear here as the agent acts…</div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px;">
+      <h3>What you'll see</h3>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div class="legend-row">🎤 <b>Voice in / voice out</b> — talk, don't tap</div>
+        <div class="legend-row">👁️ <b>Vision</b> — bills + scam SMS analysis</div>
+        <div class="legend-row">💸 <b>Send & split</b> — confirmed by voice</div>
+        <div class="legend-row">📊 <b>Spending</b> — answered in plain English</div>
+        <div class="legend-row">🛡️ <b>Fraud finale</b> — real bunq sandbox call</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="footer">Built for the bunq hackathon · powered by <span>Claude Opus 4.6</span> · "One interface. Your voice. Your bank."</div>
+</div>
+
+<script>
+  // ---- Scene definitions --------------------------------------------------
+  // each scene: { title, who, line, render(cardArea), state, duration(ms) }
+  const scenes = [
+    {
+      title: "Scene 1 — Intro",
+      who: "guardian",
+      line: "Hi Kunal! What can I help with today?",
+      avatar: "speaking",
+      state: { action: "Greeting", detail: "Avatar idle, ready for voice input.", stt: "warm", llm: "—", tool: "—", tts: "playing greeting" },
+      duration: 3500,
+      render(area) { area.innerHTML = `
+        <div class="card fade">
+          <div class="row"><div class="label">Today</div><div class="label">Saturday</div></div>
+          <div class="amount" style="margin-top:4px;">€3,214.50</div>
+          <div class="label" style="margin-top:6px;">Available balance</div>
+        </div>
+        <div class="card fade" style="display:flex; align-items:center; gap:10px;">
+          <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#5b8cff,#8b7cff);display:grid;place-items:center;">🎤</div>
+          <div style="font-size:13px;color:var(--muted);">Push to talk — or just say <b style="color:var(--text);">"Hey Guardian"</b></div>
+        </div>`;
+      }
+    },
+    {
+      title: "Scene 2 — User asks to send money",
+      who: "user",
+      line: "Send forty euros to Lars for pizza.",
+      avatar: "listening",
+      state: { action: "Listening", detail: "Capturing audio with faster-whisper (base, int8).", stt: "transcribing…", llm: "—", tool: "—", tts: "—" },
+      duration: 3200,
+      render(area) { area.innerHTML = `
+        <div class="card fade" style="text-align:center;">
+          <div class="label">You're speaking…</div>
+          <div class="wave">
+            ${'<div class="bar"></div>'.repeat(13)}
+          </div>
+          <div style="color:var(--muted); font-size:12px; margin-top:6px;">"Send forty euros to Lars for pizza."</div>
+        </div>`;
+      }
+    },
+    {
+      title: "Scene 3 — Confirmation card",
+      who: "guardian",
+      line: "Sending forty euros to Lars with the note 'pizza'. Should I confirm?",
+      avatar: "speaking",
+      state: { action: "Confirming transfer", detail: "Tool call queued — waiting for user yes/no.", stt: "—", llm: "intent: send_money", tool: "send_money (pending)", tts: "speaking confirmation" },
+      api: { method: "POST", ep: "/agent/intent", body: "send_money(€40 → Lars)" },
+      duration: 5200,
+      render(area) { area.innerHTML = `
+        <div class="card fade">
+          <div class="label">Confirm transfer</div>
+          <div class="amount" style="margin-top:6px;">€40.00</div>
+          <div class="recipient">
+            <div class="avatar-mini lars">L</div>
+            <div class="meta">
+              <div class="name">Lars de Vries</div>
+              <div class="sub">NL12 BUNQ 9876 5432 10</div>
+            </div>
+          </div>
+          <div class="note">📝 "pizza"</div>
+          <div class="confirm-btns">
+            <button class="btn ghost">Cancel</button>
+            <button class="btn primary" id="confirmYes">Yes, send</button>
+          </div>
+        </div>`;
+      }
+    },
+    {
+      title: "Scene 4 — Transfer succeeds",
+      who: "guardian",
+      line: "Done. Forty euros sent to Lars.",
+      avatar: "speaking",
+      state: { action: "Transfer complete", detail: "Mock ledger updated. Receipt visible to user.", stt: "—", llm: "—", tool: "send_money → 200 OK", tts: "speaking confirmation" },
+      api: { method: "POST", ep: "mock_bank.send_money", ok: "200 · €40.00 sent · ref tx_4f29c1" },
+      balance: "€3,174.50",
+      duration: 4000,
+      render(area) { area.innerHTML = `
+        <div class="success fade">
+          <div class="check">✓</div>
+          <div>
+            <div style="font-weight:700;">€40.00 sent to Lars</div>
+            <div style="color:var(--muted); font-size:12px;">Reference: tx_4f29c1 · just now</div>
+          </div>
+        </div>
+        <div class="card fade">
+          <div class="label">New balance</div>
+          <div class="amount" style="color: var(--good); margin-top:4px;">€3,174.50</div>
+          <div class="label" style="margin-top:6px;">Updated ledger</div>
+        </div>`;
+      }
+    },
+    {
+      title: "Scene 5 — Split a bill",
+      who: "user",
+      line: "Split this dinner between me, Anna, and Tom.",
+      avatar: "listening",
+      state: { action: "Listening for split request", detail: "Avatar primes the camera for the bill photo.", stt: "transcribing…", llm: "intent: split_bill", tool: "open_camera", tts: "—" },
+      duration: 3400,
+      render(area) { area.innerHTML = `
+        <div class="card fade" style="text-align:center;">
+          <div class="label">Listening…</div>
+          <div class="wave">${'<div class="bar"></div>'.repeat(13)}</div>
+          <div style="color:var(--muted); font-size:12px; margin-top:6px;">"Split this dinner between me, Anna, and Tom."</div>
+        </div>
+        <div class="card fade" style="display:flex; align-items:center; gap:10px;">
+          <div style="width:34px;height:34px;border-radius:50%;background:#222;display:grid;place-items:center;">📷</div>
+          <div style="font-size:13px;color:var(--muted);">"Show me the bill" — opening camera</div>
+        </div>`;
+      }
+    },
+    {
+      title: "Scene 6 — Camera reads receipt",
+      who: "guardian",
+      line: "I can see the bill — total is eighty-four euros.",
+      avatar: "speaking",
+      state: { action: "Vision OCR", detail: "Image uploaded to S3, pre-signed URL passed to Claude Vision.", stt: "—", llm: "claude vision: parsing receipt", tool: "analyze_bill (S3 URL)", tts: "speaking total" },
+      api: { method: "PUT", ep: "s3://guardianai-media/bills/4f8c.jpg", ok: "200 · 142KB" },
+      duration: 4800,
+      render(area) { area.innerHTML = `
+        <div class="card fade">
+          <div class="label">Captured receipt</div>
+          <div class="receipt" style="margin-top:8px;">
+            <div class="h">CAFE DE PIJP</div>
+            <div class="l"><span>2× Pasta</span><span>€26.00</span></div>
+            <div class="l"><span>1× Pizza</span><span>€14.50</span></div>
+            <div class="l"><span>3× Wine</span><span>€21.00</span></div>
+            <div class="l"><span>Dessert</span><span>€12.50</span></div>
+            <hr/>
+            <div class="l"><span>Subtotal</span><span>€74.00</span></div>
+            <div class="l"><span>Service 10%</span><span>€7.40</span></div>
+            <div class="l"><span>BTW</span><span>€2.60</span></div>
+            <hr/>
+            <div class="l total"><span>TOTAL</span><span>€84.00</span></div>
+          </div>
+        </div>`;
+      }
+    },
+    {
+      title: "Scene 7 — Split & request",
+      who: "guardian",
+      line: "That's twenty-eight euros each. Want me to request twenty-eight from Anna and Tom?",
+      avatar: "speaking",
+      state: { action: "Computing split", detail: "Three-way split → request_money tool prepared.", stt: "—", llm: "compute split: €84/3 = €28", tool: "request_money (pending ×2)", tts: "speaking split" },
+      api: { method: "POST", ep: "/agent/tool", body: "split_bill(total=84, n=3)" },
+      duration: 5400,
+      render(area) { area.innerHTML = `
+        <div class="card fade">
+          <div class="label">3-way split</div>
+          <div class="row" style="margin-top:6px;">
+            <div class="amount small">€84.00 total</div>
+            <div style="color:var(--muted); font-size:12px;">€28.00 each</div>
+          </div>
+          <div class="split-grid">
+            <div class="split-cell"><div class="a" style="background:linear-gradient(135deg,var(--accent),var(--accent-2));">Y</div><div class="n">You</div><div class="v">€28</div></div>
+            <div class="split-cell"><div class="a" style="background:linear-gradient(135deg,#ba68c8,#7e57c2);">A</div><div class="n">Anna</div><div class="v">€28</div></div>
+            <div class="split-cell"><div class="a" style="background:linear-gradient(135deg,#4fc3f7,#29b6f6);">T</div><div class="n">Tom</div><div class="v">€28</div></div>
+          </div>
+          <div class="confirm-btns">
+            <button class="btn ghost">Edit</button>
+            <button class="btn primary">Request €28 each</button>
+          </div>
+        </div>`;
+      }
+    },
+    {
+      title: "Scene 8 — Requests sent",
+      who: "guardian",
+      line: "Sent. I'll let you know when Anna and Tom pay.",
+      avatar: "speaking",
+      state: { action: "Requests dispatched", detail: "Two payment requests fired to mock bunq.", stt: "—", llm: "—", tool: "request_money → 2× 200 OK", tts: "speaking confirmation" },
+      api: { method: "POST", ep: "mock_bank.request_money ×2", ok: "200 · €28 → Anna · 200 · €28 → Tom" },
+      duration: 4200,
+      render(area) { area.innerHTML = `
+        <div class="success fade">
+          <div class="check">✓</div>
+          <div>
+            <div style="font-weight:700;">2 requests sent</div>
+            <div style="color:var(--muted); font-size:12px;">€28 from Anna · €28 from Tom</div>
+          </div>
+        </div>
+        <div class="card fade" style="display:flex; gap: 8px; align-items:center;">
+          <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#ba68c8,#7e57c2);display:grid;place-items:center; color:white; font-weight:700;">A</div>
+          <div style="flex:1;"><div style="font-size:13px;">Anna · €28.00</div><div style="font-size:11px; color:var(--muted);">Pending</div></div>
+          <div style="font-size:11px; color:var(--warn);">●  awaiting</div>
+        </div>
+        <div class="card fade" style="display:flex; gap: 8px; align-items:center;">
+          <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#4fc3f7,#29b6f6);display:grid;place-items:center; color:white; font-weight:700;">T</div>
+          <div style="flex:1;"><div style="font-size:13px;">Tom · €28.00</div><div style="font-size:11px; color:var(--muted);">Pending</div></div>
+          <div style="font-size:11px; color:var(--warn);">●  awaiting</div>
+        </div>`;
+      }
+    },
+    {
+      title: "Scene 9 — Spending question",
+      who: "user",
+      line: "How much did I spend on eating out this month?",
+      avatar: "listening",
+      state: { action: "Listening", detail: "Routing to spending summary tool.", stt: "transcribing…", llm: "intent: spending_summary(category=dining)", tool: "list_transactions", tts: "—" },
+      duration: 3400,
+      render(area) { area.innerHTML = `
+        <div class="card fade" style="text-align:center;">
+          <div class="label">Listening…</div>
+          <div class="wave">${'<div class="bar"></div>'.repeat(13)}</div>
+          <div style="color:var(--muted); font-size:12px; margin-top:6px;">"How much did I spend on eating out this month?"</div>
+        </div>`;
+      }
+    },
+    {
+      title: "Scene 10 — Spending answer + chart",
+      who: "guardian",
+      line: "Two hundred and fourteen euros. About fifteen percent more than last month.",
+      avatar: "speaking",
+      state: { action: "Summarizing spending", detail: "Aggregated 47 transactions across 6 categories.", stt: "—", llm: "summary generated", tool: "list_transactions → 47 rows", tts: "speaking summary" },
+      api: { method: "GET", ep: "mock_bank.list_transactions?cat=dining", ok: "200 · €214.10 · 18 txns" },
+      duration: 6000,
+      render(area) { area.innerHTML = `
+        <div class="card fade">
+          <div class="row"><div class="label">Eating out · April</div><div class="label" style="color: var(--warn);">+15% MoM</div></div>
+          <div class="amount" style="margin-top:4px;">€214.10</div>
+          <div class="chart" id="chart">
+            <div class="col dim"><div class="bar2" style="--h:55%"></div><div class="val">€140</div><div class="lbl">Nov</div></div>
+            <div class="col dim"><div class="bar2" style="--h:60%"></div><div class="val">€152</div><div class="lbl">Dec</div></div>
+            <div class="col dim"><div class="bar2" style="--h:70%"></div><div class="val">€176</div><div class="lbl">Jan</div></div>
+            <div class="col dim"><div class="bar2" style="--h:65%"></div><div class="val">€164</div><div class="lbl">Feb</div></div>
+            <div class="col dim"><div class="bar2" style="--h:73%"></div><div class="val">€186</div><div class="lbl">Mar</div></div>
+            <div class="col hot"><div class="bar2" style="--h:88%"></div><div class="val">€214</div><div class="lbl">Apr</div></div>
+          </div>
+        </div>
+        <div class="card fade" style="display:flex; gap:8px; align-items:center;">
+          <div style="width:30px;height:30px;border-radius:50%;background:#5b3a18;display:grid;place-items:center;">🍕</div>
+          <div style="flex:1; font-size:12px;"><b>Top spend:</b> Cafe de Pijp · €84</div>
+        </div>`;
+      }
+    },
+    {
+      title: "Scene 11 — Suspicious SMS arrives",
+      who: "user",
+      line: "Hey Guardian — I just got this text. Is this real?",
+      avatar: "alert",
+      state: { action: "Reviewing message", detail: "Phone notification raised — image handed to vision tool.", stt: "transcribing…", llm: "intent: check_message", tool: "analyze_suspicious_message", tts: "—" },
+      api: { method: "PUT", ep: "s3://guardianai-media/sms/scam_a8.png", ok: "200 · 88KB" },
+      duration: 5200,
+      render(area) { area.innerHTML = `
+        <div class="sms fade">
+          <div class="from"><b>bunq Alerts</b><span>now</span></div>
+          <div class="msg">URGENT: unusual login on your account. Verify within 10 min or your card will be blocked → <span class="url">bunq-secure-verify.co/auth?id=8821</span></div>
+        </div>
+        <div class="card fade" style="text-align:center;">
+          <div class="label">Held up to camera</div>
+          <div style="margin-top:6px; font-size:12px; color:var(--muted);">"Is this real?"</div>
+          <div class="wave">${'<div class="bar"></div>'.repeat(13)}</div>
+        </div>`;
+      }
+    },
+    {
+      title: "Scene 12 — Avatar flags scam + offers freeze",
+      who: "guardian",
+      line: "That is a scam. Don't click the link. Want me to freeze your card, just in case?",
+      avatar: "alert",
+      state: { action: "Scam detected", detail: "3 risk signals · suggesting protective freeze.", stt: "—", llm: "fraud_score: 0.96", tool: "log_incident → ticket #fr_2104", tts: "speaking warning" },
+      api: { method: "POST", ep: "mock_bank.log_incident", ok: "200 · ticket fr_2104 created" },
+      duration: 6800,
+      render(area) { area.innerHTML = `
+        <div class="fraud-card fade">
+          <div class="head">⚠️ Scam detected · 96% confidence</div>
+          <ul class="findings">
+            <li>Sender claims to be bunq, but link domain is <b>bunq-secure-verify.co</b> (not bunq.com)</li>
+            <li>Urgency pressure: "verify within 10 min"</li>
+            <li>Threat language: card will be blocked</li>
+            <li>bunq never asks customers to verify by SMS link</li>
+          </ul>
+          <div class="confirm-btns" style="margin-top: 4px;">
+            <button class="btn ghost">Just log it</button>
+            <button class="btn danger" id="freezeBtn">Freeze my card</button>
+          </div>
+        </div>`;
+      }
+    },
+    {
+      title: "Scene 13 — Real bunq sandbox call",
+      who: "guardian",
+      line: "Card frozen. You're safe. I've also reported this number.",
+      avatar: "speaking",
+      state: { action: "Card frozen (real call)", detail: "One real bunq sandbox API request fired — visible in DevTools.", stt: "—", llm: "—", tool: "freeze_card → bunq sandbox 200 OK", tts: "speaking confirmation" },
+      api: { method: "POST", ep: "api.bunq.com/v1/user/.../card-debit/freeze", ok: "200 · card_id=8821 · frozen" },
+      duration: 6000,
+      render(area) { area.innerHTML = `
+        <div class="freeze fade">
+          <span class="frozen-tag">FROZEN</span>
+          <div class="lbl-row">
+            <div style="font-size:12px; color:var(--muted); letter-spacing:0.12em;">BUNQ DEBIT</div>
+            <div style="font-weight:700; font-size:13px;">●●●●</div>
+          </div>
+          <div class="num">5301 ●●●● ●●●● 8821</div>
+          <div class="name-row">
+            <span>K. NARWANI</span>
+            <span>04/29</span>
+          </div>
+        </div>
+        <div class="success fade">
+          <div class="check">🛡️</div>
+          <div>
+            <div style="font-weight:700;">You're protected</div>
+            <div style="color:var(--muted); font-size:12px;">Card frozen · incident logged · scam reported</div>
+          </div>
+        </div>`;
+      }
+    }
+  ];
+
+  // ---- Wiring -------------------------------------------------------------
+  const $ = (id) => document.getElementById(id);
+  const cardArea = $("cardArea");
+  const dialog = $("dialog");
+  const dialogText = $("dialogText");
+  const avatarBg = $("avatarBg");
+  const avatarSvg = $("avatarSvg");
+  const sceneList = $("sceneList");
+  const playBtn = $("playBtn");
+  const playIcon = $("playIcon");
+  const muteBtn = $("muteBtn");
+  const sceneTitle = $("sceneTitle");
+  const sceneCounter = $("sceneCounter");
+  const scrubFill = $("scrubFill");
+  const stateAction = $("stateAction");
+  const stateDetail = $("stateDetail");
+  const apiCallsBox = $("apiCalls");
+  const balanceEl = $("balance");
+  const voiceToggleEl = $("voiceToggle");
+
+  let current = -1;
+  let playing = false;
+  let timer = null;
+  let progressTimer = null;
+  let progressStart = 0;
+  let voiceOn = true;
+  let muted = false;
+
+  // populate scene list
+  scenes.forEach((s, i) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="num">${i+1}</span><span>${s.title.replace(/^Scene \d+ — /, '')}</span>`;
+    li.dataset.idx = i;
+    li.addEventListener("click", () => goTo(i, true));
+    sceneList.appendChild(li);
+  });
+
+  // clock
+  function tickClock() {
+    const d = new Date();
+    const hh = d.getHours().toString();
+    const mm = d.getMinutes().toString().padStart(2, "0");
+    $("clock").textContent = `${hh}:${mm}`;
+  }
+  tickClock(); setInterval(tickClock, 30000);
+
+  // voice toggle
+  voiceToggleEl.classList.add("on");
+  voiceToggleEl.addEventListener("click", () => {
+    voiceOn = !voiceOn;
+    voiceToggleEl.classList.toggle("on", voiceOn);
+    if (!voiceOn) cancelSpeech();
+  });
+
+  // mute button (mirrors voice toggle for convenience)
+  muteBtn.addEventListener("click", () => {
+    voiceOn = !voiceOn;
+    voiceToggleEl.classList.toggle("on", voiceOn);
+    if (!voiceOn) cancelSpeech();
+  });
+
+  // Speech synthesis helper
+  let preferredVoice = null;
+  function pickVoice() {
+    if (!("speechSynthesis" in window)) return;
+    const voices = speechSynthesis.getVoices();
+    if (!voices.length) return;
+    // prefer warm female English voice
+    const order = [
+      v => /samantha/i.test(v.name) && /en/i.test(v.lang),
+      v => /serena|kate|moira|karen|tessa/i.test(v.name) && /en/i.test(v.lang),
+      v => /female/i.test(v.name) && /en/i.test(v.lang),
+      v => /en-(us|gb)/i.test(v.lang),
+      v => /^en/i.test(v.lang)
+    ];
+    for (const test of order) {
+      const m = voices.find(test);
+      if (m) { preferredVoice = m; return; }
+    }
+    preferredVoice = voices[0];
+  }
+  if ("speechSynthesis" in window) {
+    pickVoice();
+    speechSynthesis.onvoiceschanged = pickVoice;
+  }
+
+  function cancelSpeech() {
+    try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch(e){}
+  }
+
+  function speak(text, who) {
+    cancelSpeech();
+    if (!voiceOn || !("speechSynthesis" in window)) return;
+    if (who === "user") return; // only avatar speaks
+    const u = new SpeechSynthesisUtterance(text);
+    if (preferredVoice) u.voice = preferredVoice;
+    u.rate = 1.0;
+    u.pitch = 1.05;
+    u.volume = 1.0;
+    speechSynthesis.speak(u);
+  }
+
+  function setAgentState(s) {
+    stateAction.textContent = s.action || "—";
+    stateDetail.textContent = s.detail || "";
+    $("sttState").textContent = s.stt || "—";
+    $("llmState").textContent = s.llm || "—";
+    $("toolState").textContent = s.tool || "—";
+    $("ttsState").textContent = s.tts || "—";
+  }
+
+  function logApiCall(api) {
+    if (!api) return;
+    const div = document.createElement("div");
+    div.className = "fade";
+    div.style.marginBottom = "6px";
+    div.innerHTML = `<span class="method">${api.method}</span> <span class="ep">${api.ep}</span>${api.body ? `<div style="color:var(--muted); padding-left: 6px;">→ ${api.body}</div>` : ""}${api.ok ? `<div class="ok">✓ ${api.ok}</div>` : ""}`;
+    if (apiCallsBox.querySelector("[style*='italic']")) apiCallsBox.innerHTML = "";
+    apiCallsBox.appendChild(div);
+    // keep last 4
+    while (apiCallsBox.children.length > 4) apiCallsBox.removeChild(apiCallsBox.firstChild);
+    apiCallsBox.scrollTop = apiCallsBox.scrollHeight;
+  }
+
+  function updateSceneListUI() {
+    [...sceneList.children].forEach((li, i) => {
+      li.classList.remove("active", "done");
+      if (i < current) li.classList.add("done");
+      if (i === current) li.classList.add("active");
+    });
+  }
+
+  function startProgress(durationMs) {
+    cancelAnimationFrame(progressTimer);
+    progressStart = performance.now();
+    function step(now) {
+      const pct = Math.min(100, ((now - progressStart) / durationMs) * 100);
+      scrubFill.style.width = pct + "%";
+      if (pct < 100 && playing) progressTimer = requestAnimationFrame(step);
+    }
+    progressTimer = requestAnimationFrame(step);
+  }
+
+  function renderScene(i) {
+    const s = scenes[i];
+    sceneTitle.textContent = s.title;
+    sceneCounter.textContent = `${i+1} / ${scenes.length}`;
+    dialog.classList.toggle("user", s.who === "user");
+    dialog.querySelector(".who").textContent = s.who === "user" ? "You" : "Guardian";
+    dialog.querySelector(".who").className = "who " + (s.who === "user" ? "user" : "guardian");
+    dialogText.textContent = s.line;
+    dialog.classList.add("fade");
+    setTimeout(() => dialog.classList.remove("fade"), 400);
+
+    // avatar state
+    avatarBg.classList.remove("speaking", "listening", "alert");
+    avatarSvg.classList.remove("speaking");
+    if (s.avatar === "speaking") { avatarBg.classList.add("speaking"); avatarSvg.classList.add("speaking"); }
+    else if (s.avatar === "listening") avatarBg.classList.add("listening");
+    else if (s.avatar === "alert") { avatarBg.classList.add("alert"); avatarSvg.classList.add("speaking"); }
+
+    // render card area
+    cardArea.innerHTML = "";
+    s.render(cardArea);
+
+    // animate chart bars after insertion
+    cardArea.querySelectorAll(".bar2").forEach((b) => {
+      const h = b.style.getPropertyValue("--h") || b.dataset.h;
+      requestAnimationFrame(() => { b.style.height = h; });
+    });
+
+    // state + api + balance
+    if (s.state) setAgentState(s.state);
+    if (s.api) logApiCall(s.api);
+    if (s.balance) balanceEl.textContent = s.balance;
+
+    // speak
+    if (s.who === "guardian") speak(s.line, "guardian");
+
+    updateSceneListUI();
+    startProgress(s.duration);
+  }
+
+  function goTo(i, fromClick=false) {
+    if (i < 0) i = 0;
+    if (i >= scenes.length) {
+      // end of demo
+      pause();
+      current = scenes.length - 1;
+      scrubFill.style.width = "100%";
+      return;
+    }
+    current = i;
+    renderScene(i);
+    if (playing) scheduleNext(scenes[i].duration);
+    if (!playing && fromClick) {
+      // single-step preview only
+    }
+  }
+
+  function scheduleNext(ms) {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (!playing) return;
+      goTo(current + 1);
+    }, ms);
+  }
+
+  function play() {
+    if (current === -1 || current >= scenes.length - 1 && scrubFill.style.width === "100%") current = -1;
+    playing = true;
+    playIcon.innerHTML = '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
+    if (current === -1) goTo(0);
+    else { renderScene(current); scheduleNext(scenes[current].duration); }
+  }
+
+  function pause() {
+    playing = false;
+    playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+    clearTimeout(timer);
+    cancelAnimationFrame(progressTimer);
+    cancelSpeech();
+  }
+
+  playBtn.addEventListener("click", () => playing ? pause() : play());
+  $("nextBtn").addEventListener("click", () => { cancelSpeech(); goTo((current<0?0:current) + 1); if (playing) scheduleNext(scenes[current]?.duration || 3000); });
+  $("prevBtn").addEventListener("click", () => { cancelSpeech(); goTo(Math.max(0, current - 1)); if (playing) scheduleNext(scenes[current]?.duration || 3000); });
+  $("restartBtn").addEventListener("click", () => {
+    cancelSpeech();
+    apiCallsBox.innerHTML = `<div style="color:var(--muted); font-style: italic;">// API calls appear here as the agent acts…</div>`;
+    balanceEl.textContent = "€3,214.50";
+    current = -1;
+    if (playing) play();
+    else { goTo(0); pause(); }
+  });
+
+  // initial state
+  goTo(0);
+  pause();
+</script>
+</body>
+</html>
